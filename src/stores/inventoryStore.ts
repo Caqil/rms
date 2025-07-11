@@ -8,6 +8,7 @@ interface InventoryItem {
   unit: string;
   cost: number;
   reorderLevel: number;
+  maxStock: number; // Added missing maxStock property
   expirationDate?: Date;
   supplierInfo: {
     name: string;

@@ -42,6 +42,7 @@ import { useInventory } from "@/hooks/useInventory";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import InventoryForm from "@/components/forms/InventoryForm";
 import ReorderAlerts from "@/components/inventory/ReorderAlerts";
+import StockAdjustmentModal from "@/components/inventory/StockAdjustmentModal";
 
 export default function InventoryPage() {
   const [showCreateDialog, setShowCreateDialog] = useState(false);

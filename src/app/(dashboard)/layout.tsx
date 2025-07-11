@@ -1,12 +1,14 @@
-// app/dashboard/layout.tsx
+// src/app/(dashboard)/layout.tsx
 "use client";
 
 import { useSession } from "next-auth/react";
 import { redirect } from "next/navigation";
 import { useState } from "react";
-import Sidebar from "@/components/layout/Sidebar";
-import Header from "@/components/layout/Header";
 import { Toaster } from "sonner";
+import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
+import { Skeleton } from "@/components/ui/skeleton";
+import { AppSidebar } from "@/components/layout/AppSidebar";
+import { Header } from '../../components/layout/Header';
 
 export default function DashboardLayout({
   children,
@@ -14,12 +16,18 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const { data: session, status } = useSession();
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
 
   if (status === "loading") {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-indigo-600"></div>
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="space-y-4 w-full max-w-md">
+          <Skeleton className="h-8 w-3/4 mx-auto" />
+          <Skeleton className="h-4 w-1/2 mx-auto" />
+          <div className="flex justify-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+          </div>
+        </div>
       </div>
     );
   }
@@ -29,26 +37,17 @@ export default function DashboardLayout({
   }
 
   return (
-    <div className="h-screen flex overflow-hidden bg-gray-100">
-      <Sidebar
-        sidebarOpen={sidebarOpen}
-        setSidebarOpen={setSidebarOpen}
-        userRole={session?.user?.role || ""}
-      />
-
-      <div className="flex flex-col w-0 flex-1 overflow-hidden">
-        <Header setSidebarOpen={setSidebarOpen} user={session?.user} />
-
-        <main className="flex-1 relative overflow-y-auto focus:outline-none">
-          <div className="py-6">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8">
-              {children}
-            </div>
-          </div>
-        </main>
+    <SidebarProvider>
+      <div className="min-h-screen flex w-full bg-background">
+        <AppSidebar userRole={session?.user?.role || ""} />
+        <SidebarInset className="flex flex-col">
+          <Header user={session?.user} />
+          <main className="flex-1 overflow-y-auto">
+            <div className="container mx-auto p-6 space-y-6">{children}</div>
+          </main>
+        </SidebarInset>
       </div>
-
-      <Toaster />
-    </div>
+      <Toaster richColors />
+    </SidebarProvider>
   );
 }

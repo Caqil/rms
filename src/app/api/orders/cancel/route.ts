@@ -1,8 +1,10 @@
+
 import { NextRequest, NextResponse } from 'next/server';
 import { getToken } from 'next-auth/jwt';
 import { connectToDatabase } from '@/lib/db';
 import Order from '@/models/Order';
 import { PERMISSIONS, hasPermission } from '@/lib/permissions';
+
 export async function PATCH(request: NextRequest) {
   try {
     const token = await getToken({ req: request });
@@ -22,38 +24,67 @@ export async function PATCH(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { orderId, reason } = body;
+    const { orderId, reason, cancelledAt } = body;
+
+    if (!orderId || !reason) {
+      return NextResponse.json(
+        { success: false, message: 'Order ID and cancellation reason are required' },
+        { status: 400 }
+      );
+    }
 
     await connectToDatabase();
 
-    const order = await Order.findOneAndUpdate(
-      { 
-        _id: orderId, 
-        restaurantId: token.restaurantId,
-        status: { $nin: ['completed', 'cancelled'] }
-      },
-      { 
-        status: 'cancelled',
-        'timestamps.cancelled': new Date(),
-        cancellationReason: reason || 'Cancelled by staff'
-      },
-      { new: true }
-    );
-
+    const order = await Order.findById(orderId);
     if (!order) {
       return NextResponse.json(
-        { success: false, message: 'Order not found or cannot be cancelled' },
+        { success: false, message: 'Order not found' },
         { status: 404 }
       );
     }
 
-    // TODO: Handle refund processing if payment was completed
-    // TODO: Update inventory if items were already prepared
+    // Check if order can be cancelled
+    if (['completed', 'cancelled'].includes(order.status)) {
+      return NextResponse.json(
+        { success: false, message: 'Cannot cancel completed or already cancelled orders' },
+        { status: 400 }
+      );
+    }
+
+    // Update order status to cancelled
+    const updatedOrder = await Order.findByIdAndUpdate(
+      orderId,
+      {
+        $set: {
+          status: 'cancelled',
+          cancelledAt: cancelledAt || new Date(),
+          cancellationReason: reason,
+          cancelledBy: token.sub,
+          // Update payment status if payment was completed
+          ...(order.paymentInfo.status === 'completed' && {
+            'paymentInfo.status': 'refunded'
+          })
+        }
+      },
+      { new: true }
+    )
+    .populate('items.menuItemId', 'name preparationTime category')
+    .populate('customerId', 'name email phone')
+    .populate('staffId', 'name');
+
+    // Log the cancellation for audit trail
+    console.log(`Order ${order.orderNumber} cancelled by user ${token.sub}. Reason: ${reason}`);
+
+    // TODO: Implement inventory restoration logic here
+    // If items were already deducted from inventory, restore them
+
+    // TODO: Implement refund processing logic here
+    // If payment was processed, initiate refund
 
     return NextResponse.json({
       success: true,
       message: 'Order cancelled successfully',
-      data: order,
+      data: updatedOrder,
     });
   } catch (error: any) {
     console.error('Cancel order error:', error);

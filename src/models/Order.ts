@@ -1,4 +1,4 @@
-import mongoose, { Schema } from "mongoose";
+import mongoose, { Schema, Document } from "mongoose";
 
 export interface IOrder extends Document {
   _id: string;
@@ -56,6 +56,14 @@ export interface IOrder extends Document {
   staffId: string;
   kitchenNotes?: string;
   customerNotes?: string;
+  priority?: 'low' | 'normal' | 'high' | 'urgent';
+  estimatedCompletionTime?: Date;
+  actualCompletionTime?: Date;
+  cancelledAt?: Date;
+  cancellationReason?: string;
+  cancelledBy?: string;
+  refundAmount?: number;
+  refundReason?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -126,13 +134,44 @@ const OrderSchema = new Schema({
   },
   staffId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
   kitchenNotes: { type: String },
-  customerNotes: { type: String }
+  customerNotes: { type: String },
+  priority: { 
+    type: String, 
+    enum: ['low', 'normal', 'high', 'urgent'],
+    default: 'normal'
+  },
+  estimatedCompletionTime: { type: Date },
+  actualCompletionTime: { type: Date },
+  cancelledAt: { type: Date },
+  cancellationReason: { type: String },
+  cancelledBy: { type: Schema.Types.ObjectId, ref: 'User' },
+  refundAmount: { type: Number },
+  refundReason: { type: String }
 }, {
   timestamps: true
 });
 
+// Indexes for better query performance
 OrderSchema.index({ restaurantId: 1, status: 1 });
 OrderSchema.index({ orderNumber: 1 });
 OrderSchema.index({ createdAt: -1 });
+OrderSchema.index({ 'timestamps.ordered': -1 });
+OrderSchema.index({ tableNumber: 1 });
+OrderSchema.index({ customerId: 1 });
+OrderSchema.index({ staffId: 1 });
+
+// Pre-save middleware to calculate estimated completion time
+OrderSchema.pre('save', function(next) {
+  if (this.isNew && !this.estimatedCompletionTime) {
+    // Calculate estimated completion time based on item preparation times
+    // This would require populated menu items to get preparation times
+    const baseTime = 15; // 15 minute default
+    const itemCount = this.items.reduce((sum, item) => sum + item.quantity, 0);
+    const estimatedMinutes = Math.max(baseTime, itemCount * 3); // 3 minutes per item minimum
+    
+    this.estimatedCompletionTime = new Date(Date.now() + estimatedMinutes * 60000);
+  }
+  next();
+});
 
 export default mongoose.models.Order || mongoose.model<IOrder>('Order', OrderSchema);

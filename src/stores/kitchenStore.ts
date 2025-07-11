@@ -1,15 +1,20 @@
 import { create } from 'zustand';
 
+interface KitchenOrderItem {
+  _id: string; // Added missing _id property
+  name: string;
+  quantity: number;
+  specialInstructions?: string;
+  preparationTime: number;
+  category: string; // Added missing category property
+  allergens: string[]; // Added missing allergens property
+}
+
 interface KitchenOrder {
   _id: string;
   orderNumber: string;
   tableNumber?: string;
-  items: Array<{
-    name: string;
-    quantity: number;
-    specialInstructions?: string;
-    preparationTime: number;
-  }>;
+  items: KitchenOrderItem[]; // Updated to use the proper interface
   status: 'pending' | 'preparing' | 'ready';
   orderType: 'dine_in' | 'takeout' | 'delivery';
   estimatedTime: number;
@@ -89,3 +94,6 @@ export const useKitchenStore = create<KitchenState>((set, get) => ({
     return orders.filter(order => order.priority === priority);
   },
 }));
+
+// Export the interfaces for use in other components
+export type { KitchenOrder, KitchenOrderItem };

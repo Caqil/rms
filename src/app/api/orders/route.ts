@@ -1,3 +1,4 @@
+// src/app/api/orders/route.ts (Updated)
 import { NextRequest, NextResponse } from 'next/server';
 import { getToken } from 'next-auth/jwt';
 import { connectToDatabase } from '@/lib/db';
@@ -16,12 +17,20 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    const userPermissions = token.permissions as string[] || [];
+    if (!hasPermission(userPermissions, PERMISSIONS.ORDER_READ)) {
+      return NextResponse.json(
+        { success: false, message: 'Insufficient permissions' },
+        { status: 403 }
+      );
+    }
+
     const { searchParams } = new URL(request.url);
     const queryParams = Object.fromEntries(searchParams.entries());
     
     const { page, limit, sortBy, sortOrder } = paginationSchema.parse({
       page: queryParams.page ? parseInt(queryParams.page) : 1,
-      limit: queryParams.limit ? parseInt(queryParams.limit) : 20,
+      limit: queryParams.limit ? parseInt(queryParams.limit) : 50,
       sortBy: queryParams.sortBy || 'createdAt',
       sortOrder: queryParams.sortOrder || 'desc',
     });
@@ -31,25 +40,70 @@ export async function GET(request: NextRequest) {
     // Build query
     const query: any = {};
     if (token.restaurantId) query.restaurantId = token.restaurantId;
-    if (queryParams.status) query.status = queryParams.status;
-    if (queryParams.orderType) query.orderType = queryParams.orderType;
-    if (queryParams.tableNumber) query.tableNumber = queryParams.tableNumber;
-    if (queryParams.date) {
-      const date = new Date(queryParams.date);
-      const nextDay = new Date(date);
-      nextDay.setDate(date.getDate() + 1);
-      query.createdAt = {
-        $gte: date,
-        $lt: nextDay,
-      };
+    
+    // Filter by status
+    if (queryParams.status && queryParams.status !== 'all') {
+      query.status = queryParams.status;
+    }
+    
+    // Filter by order type
+    if (queryParams.orderType && queryParams.orderType !== 'all') {
+      query.orderType = queryParams.orderType;
+    }
+    
+    // Filter by table number
+    if (queryParams.tableNumber) {
+      query.tableNumber = queryParams.tableNumber;
+    }
+    
+    // Filter by date range
+    if (queryParams.dateRange) {
+      const now = new Date();
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      
+      switch (queryParams.dateRange) {
+        case 'today':
+          query.createdAt = { $gte: today };
+          break;
+        case 'week':
+          const weekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
+          query.createdAt = { $gte: weekAgo };
+          break;
+        case 'month':
+          const monthAgo = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
+          query.createdAt = { $gte: monthAgo };
+          break;
+        case 'custom':
+          if (queryParams.startDate && queryParams.endDate) {
+            query.createdAt = {
+              $gte: new Date(queryParams.startDate),
+              $lte: new Date(queryParams.endDate)
+            };
+          }
+          break;
+      }
+    }
+    
+    // Search functionality
+    if (queryParams.search) {
+      const searchRegex = new RegExp(queryParams.search, 'i');
+      query.$or = [
+        { orderNumber: searchRegex },
+        { 'customerInfo.name': searchRegex },
+        { 'customerInfo.phone': searchRegex },
+        { tableNumber: searchRegex }
+      ];
     }
 
     const total = await Order.countDocuments(query);
     const orders = await Order.find(query)
-      .populate('items.menuItemId', 'name price')
+      .populate({
+        path: 'items.menuItemId',
+        select: 'name price preparationTime category'
+      })
       .populate('customerId', 'name email phone')
       .populate('staffId', 'name')
-      .sort({ [sortBy as string]: sortOrder === 'asc' ? 1 : -1 })
+      .sort({ [String(sortBy)]: sortOrder === 'asc' ? 1 : -1 })
       .skip((page - 1) * limit)
       .limit(limit);
 

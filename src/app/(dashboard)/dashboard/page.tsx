@@ -1,7 +1,7 @@
+// src/app/(dashboard)/dashboard/page.tsx
 "use client";
 
 import { useSession } from "next-auth/react";
-import { useEffect, useState } from "react";
 import {
   Card,
   CardContent,
@@ -12,15 +12,22 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Progress } from "@/components/ui/progress";
 import {
   ShoppingCart,
   Users,
   Package,
   DollarSign,
   TrendingUp,
+  TrendingDown,
   Clock,
   AlertTriangle,
   CheckCircle,
+  Eye,
+  MoreHorizontal,
+  ArrowUpRight,
+  Activity,
+  RefreshCw,
 } from "lucide-react";
 import {
   LineChart,
@@ -34,99 +41,47 @@ import {
   Bar,
 } from "recharts";
 import { formatCurrency } from "@/lib/utils";
-
-interface DashboardStats {
-  totalOrders: number;
-  todayOrders: number;
-  totalRevenue: number;
-  todayRevenue: number;
-  activeCustomers: number;
-  lowStockItems: number;
-  pendingOrders: number;
-  completedOrders: number;
-}
-
-interface ChartData {
-  name: string;
-  orders: number;
-  revenue: number;
-}
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { useDashboard } from "@/hooks/useDashboard";
 
 export default function DashboardPage() {
   const { data: session } = useSession();
-  const [stats, setStats] = useState<DashboardStats>({
-    totalOrders: 0,
-    todayOrders: 0,
-    totalRevenue: 0,
-    todayRevenue: 0,
-    activeCustomers: 0,
-    lowStockItems: 0,
-    pendingOrders: 0,
-    completedOrders: 0,
-  });
+  const { stats, isLoading, refetch } = useDashboard();
 
-  const [chartData, setChartData] = useState<ChartData[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case "completed":
+        return "bg-green-500";
+      case "preparing":
+        return "bg-blue-500";
+      case "ready":
+        return "bg-orange-500";
+      case "pending":
+        return "bg-yellow-500";
+      default:
+        return "bg-gray-500";
+    }
+  };
 
-  // Mock data for demonstration
-  useEffect(() => {
-    // Simulate API call
-    setTimeout(() => {
-      setStats({
-        totalOrders: 1247,
-        todayOrders: 23,
-        totalRevenue: 45678.9,
-        todayRevenue: 2345.67,
-        activeCustomers: 156,
-        lowStockItems: 5,
-        pendingOrders: 8,
-        completedOrders: 15,
-      });
-
-      setChartData([
-        { name: "Mon", orders: 24, revenue: 2100 },
-        { name: "Tue", orders: 18, revenue: 1800 },
-        { name: "Wed", orders: 32, revenue: 2900 },
-        { name: "Thu", orders: 28, revenue: 2400 },
-        { name: "Fri", orders: 45, revenue: 4200 },
-        { name: "Sat", orders: 52, revenue: 5100 },
-        { name: "Sun", orders: 38, revenue: 3400 },
-      ]);
-
-      setIsLoading(false);
-    }, 1000);
-  }, []);
-
-  const StatCard = ({
-    title,
-    value,
-    icon: Icon,
-    trend,
-    trendValue,
-    color = "blue",
-  }: any) => (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium">{title}</CardTitle>
-        <Icon className={`h-4 w-4 text-${color}-600`} />
-      </CardHeader>
-      <CardContent>
-        <div className="text-2xl font-bold">{value}</div>
-        {trend && (
-          <p className="text-xs text-muted-foreground">
-            <span
-              className={`inline-flex items-center ${
-                trend === "up" ? "text-green-600" : "text-red-600"
-              }`}
-            >
-              {trend === "up" ? "↗" : "↘"} {trendValue}
-            </span>{" "}
-            from yesterday
-          </p>
-        )}
-      </CardContent>
-    </Card>
-  );
+  const getStatusBadge = (
+    status: string
+  ): "secondary" | "destructive" | "outline" | "default" | null | undefined => {
+    const variants: Record<string, "secondary" | "destructive" | "outline" | "default"> = {
+      completed: "default",
+      preparing: "secondary",
+      ready: "destructive",
+      pending: "outline",
+    };
+    return variants[status] || "outline";
+  };
 
   if (isLoading) {
     return (
@@ -134,11 +89,13 @@ export default function DashboardPage() {
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           {[1, 2, 3, 4].map((i) => (
             <Card key={i}>
-              <CardHeader>
-                <div className="h-4 bg-gray-200 rounded animate-pulse"></div>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <div className="h-4 w-20 bg-muted animate-pulse rounded"></div>
+                <div className="h-4 w-4 bg-muted animate-pulse rounded"></div>
               </CardHeader>
               <CardContent>
-                <div className="h-8 bg-gray-200 rounded animate-pulse"></div>
+                <div className="h-8 w-16 bg-muted animate-pulse rounded"></div>
+                <div className="h-3 w-24 bg-muted animate-pulse rounded mt-2"></div>
               </CardContent>
             </Card>
           ))}
@@ -154,244 +111,369 @@ export default function DashboardPage() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
           <p className="text-muted-foreground">
-            Welcome back, {session?.user?.name}! Here's what's happening at your
-            restaurant.
+            Welcome back, {session?.user?.name}! Here's what's happening today.
           </p>
         </div>
-        <div className="flex space-x-2">
-          <Button>View Reports</Button>
-          <Button variant="outline">Export Data</Button>
+        <div className="flex items-center space-x-2">
+          <Button variant="outline" onClick={() => refetch()}>
+            <RefreshCw className="mr-2 h-4 w-4" />
+            Refresh
+          </Button>
+          <Button variant="outline">
+            <Activity className="mr-2 h-4 w-4" />
+            View Reports
+          </Button>
+          <Button>
+            <ArrowUpRight className="mr-2 h-4 w-4" />
+            Export Data
+          </Button>
         </div>
       </div>
 
-      {/* Quick Stats */}
+      {/* Key Metrics */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <StatCard
-          title="Today's Orders"
-          value={stats.todayOrders}
-          icon={ShoppingCart}
-          trend="up"
-          trendValue="+12%"
-          color="blue"
-        />
-        <StatCard
-          title="Today's Revenue"
-          value={formatCurrency(stats.todayRevenue)}
-          icon={DollarSign}
-          trend="up"
-          trendValue="+8%"
-          color="green"
-        />
-        <StatCard
-          title="Active Customers"
-          value={stats.activeCustomers}
-          icon={Users}
-          trend="up"
-          trendValue="+5%"
-          color="purple"
-        />
-        <StatCard
-          title="Low Stock Items"
-          value={stats.lowStockItems}
-          icon={AlertTriangle}
-          color="orange"
-        />
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">
+              Today's Revenue
+            </CardTitle>
+            <DollarSign className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {formatCurrency(stats.todayRevenue)}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {stats.revenueGrowth >= 0 ? (
+                <span className="text-green-600 inline-flex items-center">
+                  <TrendingUp className="h-3 w-3 mr-1" />+
+                  {stats.revenueGrowth.toFixed(1)}%
+                </span>
+              ) : (
+                <span className="text-red-600 inline-flex items-center">
+                  <TrendingDown className="h-3 w-3 mr-1" />
+                  {stats.revenueGrowth.toFixed(1)}%
+                </span>
+              )}{" "}
+              from yesterday
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Orders Today</CardTitle>
+            <ShoppingCart className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.todayOrders}</div>
+            <p className="text-xs text-muted-foreground">
+              {stats.orderGrowth >= 0 ? (
+                <span className="text-green-600 inline-flex items-center">
+                  <TrendingUp className="h-3 w-3 mr-1" />+
+                  {stats.orderGrowth.toFixed(1)}%
+                </span>
+              ) : (
+                <span className="text-red-600 inline-flex items-center">
+                  <TrendingDown className="h-3 w-3 mr-1" />
+                  {stats.orderGrowth.toFixed(1)}%
+                </span>
+              )}{" "}
+              from yesterday
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">
+              Active Customers
+            </CardTitle>
+            <Users className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.activeCustomers}</div>
+            <p className="text-xs text-muted-foreground">
+              <span className="text-blue-600 inline-flex items-center">
+                <Eye className="h-3 w-3 mr-1" />
+                {stats.totalCustomers} total
+              </span>{" "}
+              registered customers
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">
+              Avg Order Value
+            </CardTitle>
+            <Activity className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {formatCurrency(stats.avgOrderValue)}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              <span className="text-green-600 inline-flex items-center">
+                <TrendingUp className="h-3 w-3 mr-1" />+{stats.monthlyGrowth}%
+              </span>{" "}
+              this month
+            </p>
+          </CardContent>
+        </Card>
       </div>
 
-      {/* Charts and Activity */}
+      {/* Charts and Tables */}
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-7">
-        {/* Sales Chart */}
+        {/* Revenue Chart */}
         <Card className="col-span-4">
           <CardHeader>
             <CardTitle>Weekly Overview</CardTitle>
             <CardDescription>
-              Orders and revenue for the past 7 days
+              Daily performance for the past 7 days
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <Tabs defaultValue="orders" className="space-y-4">
+            <Tabs defaultValue="revenue" className="space-y-4">
               <TabsList>
-                <TabsTrigger value="orders">Orders</TabsTrigger>
                 <TabsTrigger value="revenue">Revenue</TabsTrigger>
+                <TabsTrigger value="orders">Orders</TabsTrigger>
+                <TabsTrigger value="customers">Customers</TabsTrigger>
               </TabsList>
-              <TabsContent value="orders">
-                <ResponsiveContainer width="100%" height={300}>
-                  <LineChart data={chartData}>
+              <TabsContent value="revenue" className="h-[300px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={stats.chartData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="name" />
+                    <YAxis />
+                    <Tooltip
+                      formatter={(value) => [
+                        formatCurrency(Number(value)),
+                        "Revenue",
+                      ]}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="revenue"
+                      stroke="hsl(var(--primary))"
+                      strokeWidth={2}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </TabsContent>
+              <TabsContent value="orders" className="h-[300px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={stats.chartData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="name" />
+                    <YAxis />
+                    <Tooltip />
+                    <Bar dataKey="orders" fill="hsl(var(--primary))" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </TabsContent>
+              <TabsContent value="customers" className="h-[300px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={stats.chartData}>
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="name" />
                     <YAxis />
                     <Tooltip />
                     <Line
                       type="monotone"
-                      dataKey="orders"
-                      stroke="#3b82f6"
+                      dataKey="customers"
+                      stroke="hsl(var(--secondary))"
                       strokeWidth={2}
-                      dot={{ fill: "#3b82f6" }}
                     />
                   </LineChart>
-                </ResponsiveContainer>
-              </TabsContent>
-              <TabsContent value="revenue">
-                <ResponsiveContainer width="100%" height={300}>
-                  <BarChart data={chartData}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="name" />
-                    <YAxis />
-                    <Tooltip
-                      formatter={(value) => [
-                        formatCurrency(value as number),
-                        "Revenue",
-                      ]}
-                    />
-                    <Bar dataKey="revenue" fill="#10b981" />
-                  </BarChart>
                 </ResponsiveContainer>
               </TabsContent>
             </Tabs>
           </CardContent>
         </Card>
 
-        {/* Recent Activity */}
+        {/* Quick Stats */}
         <Card className="col-span-3">
           <CardHeader>
-            <CardTitle>Recent Activity</CardTitle>
-            <CardDescription>Latest orders and updates</CardDescription>
+            <CardTitle>Quick Stats</CardTitle>
+            <CardDescription>Current status overview</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="space-y-4">
-              {[
-                {
-                  type: "order",
-                  message: "New order #1234 - Table 5",
-                  time: "2 min ago",
-                  status: "pending",
-                },
-                {
-                  type: "payment",
-                  message: "Payment received - $45.67",
-                  time: "5 min ago",
-                  status: "completed",
-                },
-                {
-                  type: "inventory",
-                  message: "Low stock alert - Tomatoes",
-                  time: "10 min ago",
-                  status: "warning",
-                },
-                {
-                  type: "order",
-                  message: "Order #1233 completed",
-                  time: "15 min ago",
-                  status: "completed",
-                },
-                {
-                  type: "customer",
-                  message: "New customer registered",
-                  time: "20 min ago",
-                  status: "info",
-                },
-              ].map((activity, index) => (
-                <div key={index} className="flex items-center space-x-3">
-                  <div
-                    className={`h-2 w-2 rounded-full ${
-                      activity.status === "pending"
-                        ? "bg-yellow-500"
-                        : activity.status === "completed"
-                        ? "bg-green-500"
-                        : activity.status === "warning"
-                        ? "bg-orange-500"
-                        : "bg-blue-500"
-                    }`}
-                  />
-                  <div className="flex-1 space-y-1">
-                    <p className="text-sm font-medium leading-none">
-                      {activity.message}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {activity.time}
-                    </p>
-                  </div>
-                  <Badge
-                    variant={
-                      activity.status === "pending"
-                        ? "secondary"
-                        : activity.status === "completed"
-                        ? "default"
-                        : activity.status === "warning"
-                        ? "destructive"
-                        : "outline"
-                    }
-                  >
-                    {activity.status}
-                  </Badge>
+            <div className="flex items-center justify-between p-3 border rounded-lg">
+              <div className="flex items-center space-x-3">
+                <div className="p-2 bg-orange-100 rounded-lg">
+                  <Clock className="h-4 w-4 text-orange-600" />
                 </div>
-              ))}
+                <div>
+                  <p className="font-medium">Pending Orders</p>
+                  <p className="text-sm text-muted-foreground">
+                    Need attention
+                  </p>
+                </div>
+              </div>
+              <div className="text-2xl font-bold text-orange-600">
+                {stats.pendingOrders}
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between p-3 border rounded-lg">
+              <div className="flex items-center space-x-3">
+                <div className="p-2 bg-green-100 rounded-lg">
+                  <CheckCircle className="h-4 w-4 text-green-600" />
+                </div>
+                <div>
+                  <p className="font-medium">Completed Today</p>
+                  <p className="text-sm text-muted-foreground">
+                    Orders fulfilled
+                  </p>
+                </div>
+              </div>
+              <div className="text-2xl font-bold text-green-600">
+                {stats.completedOrders}
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between p-3 border rounded-lg">
+              <div className="flex items-center space-x-3">
+                <div className="p-2 bg-red-100 rounded-lg">
+                  <AlertTriangle className="h-4 w-4 text-red-600" />
+                </div>
+                <div>
+                  <p className="font-medium">Stock Alerts</p>
+                  <p className="text-sm text-muted-foreground">
+                    Items running low
+                  </p>
+                </div>
+              </div>
+              <div className="text-2xl font-bold text-red-600">
+                {stats.lowStockItems}
+              </div>
+            </div>
+
+            <div className="pt-4">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm font-medium">Today's Progress</span>
+                <span className="text-sm text-muted-foreground">
+                  {Math.min(
+                    100,
+                    Math.round(
+                      (stats.todayOrders /
+                        Math.max(1, stats.todayOrders + stats.pendingOrders)) *
+                        100
+                    )
+                  )}
+                  %
+                </span>
+              </div>
+              <Progress
+                value={Math.min(
+                  100,
+                  Math.round(
+                    (stats.todayOrders /
+                      Math.max(1, stats.todayOrders + stats.pendingOrders)) *
+                      100
+                  )
+                )}
+                className="h-2"
+              />
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Quick Actions */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card className="cursor-pointer hover:shadow-md transition-shadow">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm">Pending Orders</CardTitle>
+      {/* Recent Activity */}
+      <div className="grid gap-6 md:grid-cols-2">
+        {/* Recent Orders */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Recent Orders</CardTitle>
+            <CardDescription>Latest customer orders today</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="flex items-center justify-between">
-              <span className="text-2xl font-bold text-orange-600">
-                {stats.pendingOrders}
-              </span>
-              <Clock className="h-4 w-4 text-orange-600" />
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">Need attention</p>
+            {stats.recentOrders.length > 0 ? (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Order</TableHead>
+                    <TableHead>Customer</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Amount</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {stats.recentOrders.map((order) => (
+                    <TableRow key={order.id}>
+                      <TableCell className="font-medium">{order.id}</TableCell>
+                      <TableCell>
+                        <div className="flex items-center space-x-2">
+                          <Avatar className="h-6 w-6">
+                            <AvatarFallback>
+                              {order.customer.charAt(0)}
+                            </AvatarFallback>
+                          </Avatar>
+                          <span>{order.customer}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={getStatusBadge(order.status)}>
+                          {order.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {formatCurrency(order.amount)}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            ) : (
+              <div className="text-center py-8 text-muted-foreground">
+                No orders today yet
+              </div>
+            )}
           </CardContent>
         </Card>
 
-        <Card className="cursor-pointer hover:shadow-md transition-shadow">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm">Completed Today</CardTitle>
+        {/* Top Items */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Top Selling Items</CardTitle>
+            <CardDescription>Best performing menu items today</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="flex items-center justify-between">
-              <span className="text-2xl font-bold text-green-600">
-                {stats.completedOrders}
-              </span>
-              <CheckCircle className="h-4 w-4 text-green-600" />
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Orders fulfilled
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className="cursor-pointer hover:shadow-md transition-shadow">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm">Stock Alerts</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center justify-between">
-              <span className="text-2xl font-bold text-red-600">
-                {stats.lowStockItems}
-              </span>
-              <Package className="h-4 w-4 text-red-600" />
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Items running low
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className="cursor-pointer hover:shadow-md transition-shadow">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm">Growth</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center justify-between">
-              <span className="text-2xl font-bold text-blue-600">+12%</span>
-              <TrendingUp className="h-4 w-4 text-blue-600" />
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">vs last week</p>
+            {stats.topItems.length > 0 ? (
+              <div className="space-y-4">
+                {stats.topItems.map((item, index) => (
+                  <div
+                    key={item._id}
+                    className="flex items-center justify-between"
+                  >
+                    <div className="flex items-center space-x-3">
+                      <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary font-medium text-sm">
+                        {index + 1}
+                      </div>
+                      <div>
+                        <p className="font-medium">{item.name}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {item.sales} sold
+                        </p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-medium">
+                        {formatCurrency(item.revenue)}
+                      </p>
+                      <p className="text-sm text-muted-foreground">revenue</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-muted-foreground">
+                No sales data today yet
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>

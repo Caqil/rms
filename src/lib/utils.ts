@@ -35,29 +35,6 @@ export function formatTime(date: Date | string): string {
   });
 }
 
-export function generateOrderNumber(): string {
-  const prefix = 'ORD';
-  const timestamp = Date.now().toString().slice(-6);
-  const random = Math.random().toString(36).substring(2, 5).toUpperCase();
-  return `${prefix}-${timestamp}-${random}`;
-}
-
-export function calculateOrderTotal(
-  items: Array<{ price: number; quantity: number }>,
-  taxRate: number = 0,
-  discountAmount: number = 0
-): { subtotal: number; taxes: number; total: number } {
-  const subtotal = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-  const discountedSubtotal = Math.max(0, subtotal - discountAmount);
-  const taxes = discountedSubtotal * taxRate;
-  const total = discountedSubtotal + taxes;
-
-  return {
-    subtotal: Math.round(subtotal * 100) / 100,
-    taxes: Math.round(taxes * 100) / 100,
-    total: Math.round(total * 100) / 100,
-  };
-}
 
 export function validateEmail(email: string): boolean {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -101,3 +78,15 @@ export function throttle<T extends (...args: any[]) => any>(
     }
   };
 }
+
+export { 
+  generateOrderNumber, 
+  calculateOrderTotal, 
+  getOrderStatusColor,
+  getOrderTypeLabel,
+  calculateOrderProgress,
+  getEstimatedCompletionTime,
+  isOrderDelayed,
+  formatOrderDuration,
+  getOrderPriorityLevel
+} from './orderUtils';
