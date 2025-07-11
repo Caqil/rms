@@ -10,7 +10,21 @@ const compat = new FlatCompat({
 });
 
 const eslintConfig = [
-  ...compat.extends("next/core-web-vitals", "next/typescript"),
+  ...compat.extends("next/core-web-vitals", "next/typescript",
+    {
+      files: ["**/*.ts", "**/*.tsx"],
+      rules: {
+        "@next/next/no-html-link-for-pages": "off",
+        "@next/next/no-img-element": "off",
+        "noImpliedEval": "off", // Disable the rule that prevents the use of eval-like methods
+        "@typescript-eslint/no-unused-vars": [
+          "warn",
+          { argsIgnorePattern: "^_", varsIgnorePattern: "^_" },
+        ],
+        "no-unused-vars": "off", // Disable the base rule as it can conflict with TypeScript's rule
+      },
+    }
+  ),
 ];
 
 export default eslintConfig;
