@@ -1,4 +1,5 @@
 import mongoose, { Schema, Document } from "mongoose";
+import { IMenuItem } from "./Menu";
 
 export interface IOrder extends Document {
   _id: string;
@@ -12,7 +13,7 @@ export interface IOrder extends Document {
     email?: string;
   };
   items: Array<{
-    menuItemId: string;
+    menuItemId: string | IMenuItem;
     quantity: number;
     price: number;
     specialInstructions?: string;

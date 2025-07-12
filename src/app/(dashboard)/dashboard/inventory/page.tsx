@@ -103,7 +103,7 @@ export default function InventoryPage() {
   };
 
   const getStockLevel = (item: any): "low" | "medium" | "high" => {
-    const percentage = (item.quantity / item.maxStock) * 100;
+    const percentage = (item.currentStock / item.maxStockLevel) * 100;
     if (percentage <= 20) return "low";
     if (percentage <= 50) return "medium";
     return "high";
@@ -300,13 +300,13 @@ export default function InventoryPage() {
               const stockLevel = getStockLevel(item);
               const stockPercentage = Math.min(
                 100,
-                (item.quantity / item.maxStock) * 100
+                (item.currentStock / item.maxStockLevel) * 100
               );
               const daysUntilExpiry = item.expirationDate
                 ? getDaysUntilExpiry(
                     typeof item.expirationDate === "string"
                       ? item.expirationDate
-                      : item.expirationDate.toISOString()
+                      : item.expirationDate
                   )
                 : null;
 
@@ -337,7 +337,7 @@ export default function InventoryPage() {
                         <div className="flex justify-between text-sm">
                           <span>Stock Level</span>
                           <span>
-                            {item.quantity} {item.unit}
+                            {item.currentStock} {item.unit}
                           </span>
                         </div>
                         <Progress
@@ -351,8 +351,8 @@ export default function InventoryPage() {
                           }`}
                         />
                         <div className="flex justify-between text-xs text-gray-500">
-                          <span>Reorder: {item.reorderLevel}</span>
-                          <span>Max: {item.maxStock}</span>
+                          <span>Min: {item.minStockLevel}</span>
+                          <span>Max: {item.maxStockLevel}</span>
                         </div>
                       </div>
 
@@ -367,7 +367,7 @@ export default function InventoryPage() {
                         <div className="flex justify-between">
                           <span>Total Value:</span>
                           <span className="font-medium">
-                            {formatCurrency(item.cost * item.quantity)}
+                            {formatCurrency(item.cost * item.currentStock)}
                           </span>
                         </div>
                       </div>
@@ -406,8 +406,8 @@ export default function InventoryPage() {
 
                       {/* Supplier Info */}
                       <div className="text-xs text-gray-500">
-                        <p>Supplier: {item.supplierInfo.name}</p>
-                        <p>Contact: {item.supplierInfo.contact}</p>
+                        <p>Supplier: {item.supplier || 'N/A'}</p>
+                        <p>Location: {item.location || 'N/A'}</p>
                       </div>
 
                       {/* Actions */}
@@ -481,7 +481,7 @@ export default function InventoryPage() {
                         ? getDaysUntilExpiry(
                             typeof item.expirationDate === "string"
                               ? item.expirationDate
-                              : item.expirationDate.toISOString()
+                              : item.expirationDate
                           )
                         : null;
 
@@ -493,7 +493,7 @@ export default function InventoryPage() {
                                 {item.itemName}
                               </div>
                               <div className="text-sm text-gray-500">
-                                {item.supplierInfo.name}
+                                {item.supplier || 'N/A'}
                               </div>
                             </div>
                           </td>
@@ -502,17 +502,17 @@ export default function InventoryPage() {
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="text-sm text-gray-900">
-                              {item.quantity} {item.unit}
+                              {item.currentStock} {item.unit}
                             </div>
                             <div className="text-xs text-gray-500">
-                              Reorder at {item.reorderLevel}
+                              Min: {item.minStockLevel}
                             </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                             {formatCurrency(item.cost)}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                            {formatCurrency(item.cost * item.quantity)}
+                            {formatCurrency(item.cost * item.currentStock)}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="space-y-1">

@@ -99,6 +99,15 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
+    
+    // Ensure restaurantId is provided
+    if (!token.restaurantId && !body.restaurantId) {
+      return NextResponse.json(
+        { success: false, message: "Restaurant ID is required" },
+        { status: 400 }
+      );
+    }
+    
     const validatedData = createMenuItemSchema.parse({
       ...body,
       restaurantId: token.restaurantId || body.restaurantId,

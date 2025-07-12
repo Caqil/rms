@@ -147,12 +147,12 @@ export default function DashboardPage() {
               {stats.revenueGrowth >= 0 ? (
                 <span className="text-green-600 inline-flex items-center">
                   <TrendingUp className="h-3 w-3 mr-1" />+
-                  {stats.revenueGrowth.toFixed(1)}%
+                  {stats.revenueGrowth}%
                 </span>
               ) : (
                 <span className="text-red-600 inline-flex items-center">
                   <TrendingDown className="h-3 w-3 mr-1" />
-                  {stats.revenueGrowth.toFixed(1)}%
+                  {stats.revenueGrowth}%
                 </span>
               )}{" "}
               from yesterday
@@ -171,12 +171,12 @@ export default function DashboardPage() {
               {stats.orderGrowth >= 0 ? (
                 <span className="text-green-600 inline-flex items-center">
                   <TrendingUp className="h-3 w-3 mr-1" />+
-                  {stats.orderGrowth.toFixed(1)}%
+                  {stats.orderGrowth}%
                 </span>
               ) : (
                 <span className="text-red-600 inline-flex items-center">
                   <TrendingDown className="h-3 w-3 mr-1" />
-                  {stats.orderGrowth.toFixed(1)}%
+                  {stats.orderGrowth}%
                 </span>
               )}{" "}
               from yesterday

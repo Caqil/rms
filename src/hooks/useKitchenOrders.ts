@@ -1,21 +1,25 @@
-import { useState, useEffect } from 'react';
+
+import { useEffect } from 'react';
 import { useApi, useApiMutation } from './useApi';
 import { useKitchenStore } from '@/stores/kitchenStore';
 
 export function useKitchenOrders() {
-  const kitchenStore = useKitchenStore();
+  const store = useKitchenStore();
   
-  const { data: ordersData, loading, refetch } = useApi<{ orders: any[] }>('/api/kitchen/orders');
+  // Use polling for real-time updates (every 10 seconds)
+  const { data, loading, refetch } = useApi<{ orders: any[] }>('/api/kitchen/orders', {
+    pollInterval: 10000 // Poll every 10 seconds for kitchen orders
+  });
   
   const { mutate: updateStatus } = useApiMutation('/api/orders/status', 'PATCH');
   const { mutate: updatePriority } = useApiMutation('/api/kitchen/priority', 'PATCH');
 
   useEffect(() => {
-    if (ordersData) {
-      kitchenStore.setOrders(ordersData.orders);
+    if (data) {
+      store.setOrders(data.orders);
     }
-    kitchenStore.setLoading(loading);
-  }, [ordersData, loading]);
+    store.setLoading(loading);
+  }, [data, loading]); // Fixed dependencies
 
   const updateOrderStatus = async (orderId: string, status: string) => {
     await updateStatus({ orderId, status });
@@ -42,11 +46,11 @@ export function useKitchenOrders() {
   };
 
   return {
-    orders: kitchenStore.orders,
-    pendingOrders: kitchenStore.orders.filter(o => ['pending', 'confirmed'].includes(o.status)),
-    preparingOrders: kitchenStore.orders.filter(o => o.status === 'preparing'),
-    readyOrders: kitchenStore.orders.filter(o => o.status === 'ready'),
-    isLoading: kitchenStore.isLoading,
+    orders: store.orders,
+    pendingOrders: store.orders.filter(o => ['pending', 'confirmed'].includes(o.status)),
+    preparingOrders: store.orders.filter(o => o.status === 'preparing'),
+    readyOrders: store.orders.filter(o => o.status === 'ready'),
+    isLoading: store.isLoading,
     updateOrderStatus,
     updateOrderPriority,
     startPreparation,

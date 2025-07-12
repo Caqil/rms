@@ -1,5 +1,12 @@
-import { useState, useEffect } from 'react';
-import { toast } from 'sonner';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { useSession } from 'next-auth/react';
+
+interface ApiResponse<T> {
+  success: boolean;
+  data?: T;
+  message?: string;
+  errors?: any[];
+}
 
 interface ApiState<T> {
   data: T | null;
@@ -9,73 +16,124 @@ interface ApiState<T> {
 
 interface ApiOptions {
   immediate?: boolean;
+  pollInterval?: number; // For real-time updates (in milliseconds)
 }
 
 export function useApi<T>(
-  url: string,
+  url: string, 
   options: ApiOptions = { immediate: true }
-): ApiState<T> & { refetch: () => Promise<void> } {
+) {
   const [state, setState] = useState<ApiState<T>>({
     data: null,
     loading: false,
     error: null,
   });
 
+  const { data: session } = useSession();
+  const fetchedRef = useRef(false);
+  const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  const fetchData = async () => {
-    setState(prev => ({ ...prev, loading: true, error: null }));
-    
+  const fetchData = useCallback(async () => {
+    if (!session) {
+      setState(prev => ({ ...prev, loading: false }));
+      return;
+    }
+
     try {
-      const response = await fetch(url);
-      const result = await response.json();
-      
+      setState(prev => ({ ...prev, loading: true, error: null }));
+
+      const response = await fetch(url, {
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
       if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result: ApiResponse<T> = await response.json();
+
+      if (result.success) {
+        setState({
+          data: result.data || null,
+          loading: false,
+          error: null,
+        });
+      } else {
         throw new Error(result.message || 'API request failed');
       }
-      
-      setState({
-        data: result.data,
-        loading: false,
-        error: null,
-      });
-    } catch (error: any) {
+    } catch (err) {
+      console.error('API Error:', err);
       setState({
         data: null,
         loading: false,
-        error: error.message,
+        error: err instanceof Error ? err.message : 'Unknown error',
       });
-      
-      toast.error(error.message || 'An error occurred while fetching data');
     }
-  };
+  }, [url, session]);
 
+  // Initial fetch
   useEffect(() => {
-    if (options.immediate) {
+    if (options.immediate && session && !fetchedRef.current) {
+      fetchedRef.current = true;
       fetchData();
     }
-  }, [url, options.immediate]);
+  }, [fetchData, options.immediate, session]);
+
+  // Polling effect (separate from initial fetch)
+  useEffect(() => {
+    if (options.pollInterval && session && fetchedRef.current) {
+      pollIntervalRef.current = setInterval(() => {
+        fetchData();
+      }, options.pollInterval);
+
+      return () => {
+        if (pollIntervalRef.current) {
+          clearInterval(pollIntervalRef.current);
+        }
+      };
+    }
+  }, [fetchData, options.pollInterval, session]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current);
+      }
+    };
+  }, []);
+
+  const refetch = useCallback(() => {
+    fetchedRef.current = false;
+    return fetchData();
+  }, [fetchData]);
 
   return {
     ...state,
-    refetch: fetchData,
+    refetch,
   };
 }
 
-export function useApiMutation<T, R = any>(
+export function useApiMutation<TData = any, TResponse = any>(
   url: string,
-  method: 'POST' | 'PUT' | 'PATCH' | 'DELETE' = 'POST'
+  method: 'POST' | 'PATCH' | 'DELETE' = 'POST'
 ) {
-  const [state, setState] = useState<ApiState<R>>({
-    data: null,
-    loading: false,
-    error: null,
-  });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const { data: session } = useSession();
 
+  const mutate = useCallback(async (data?: TData): Promise<TResponse | null> => {
+    if (!session) {
+      setError('Authentication required');
+      return null;
+    }
 
-  const mutate = async (data?: T): Promise<R | null> => {
-    setState(prev => ({ ...prev, loading: true, error: null }));
-    
     try {
+      setLoading(true);
+      setError(null);
+
       const response = await fetch(url, {
         method,
         headers: {
@@ -83,37 +141,32 @@ export function useApiMutation<T, R = any>(
         },
         body: data ? JSON.stringify(data) : undefined,
       });
-      
-      const result = await response.json();
-      
+
       if (!response.ok) {
-        throw new Error(result.message || 'API request failed');
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
       }
-      
-      setState({
-        data: result.data,
-        loading: false,
-        error: null,
-      });
 
-      toast.success(result.message || 'Operation completed successfully');
+      const result: ApiResponse<TResponse> = await response.json();
 
-      return result.data;
-    } catch (error: any) {
-      setState({
-        data: null,
-        loading: false,
-        error: error.message,
-      });
-
-      toast.error(error.message || 'An error occurred while fetching data');
-
-      return null;
+      if (result.success) {
+        return result.data || result as TResponse;
+      } else {
+        throw new Error(result.message || 'Request failed');
+      }
+    } catch (err) {
+      console.error('API Mutation Error:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+      setError(errorMessage);
+      throw err;
+    } finally {
+      setLoading(false);
     }
-  };
+  }, [url, method, session]);
 
   return {
-    ...state,
     mutate,
+    loading,
+    error,
   };
 }

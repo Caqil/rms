@@ -59,7 +59,7 @@ import {
   Activity,
 } from "lucide-react";
 import { formatCurrency, cn } from "@/lib/utils";
-import { useAnalytics } from "@/hooks/useAnalytics";
+//import { useAnalytics } from "@/hooks/useAnalytics";
 import { format, subDays } from "date-fns";
 
 type DateRange = {

@@ -1,34 +1,55 @@
 import { useEffect } from 'react';
 import { useTableStore } from '@/stores/tableStore';
 import { useApi, useApiMutation } from './useApi';
+import { Table } from '@/types/table';
+
+interface TablesApiResponse {
+  tables: Table[];
+}
 
 export function useTables() {
-  const tableStore = useTableStore();
-  
-  const { data: tablesData, loading, refetch } = useApi<{ tables: any[] }>('/api/tables');
-  
-  const { mutate: updateTableStatus } = useApiMutation<{ status: string }, any>(
-    '/api/tables',
-    'PATCH'
-  );
+  const {
+    tables,
+    isLoading,
+    setTables,
+    setLoading,
+    updateTableStatus,
+    getAvailableTables,
+    getTablesBySection,
+    getTableByNumber,
+  } = useTableStore();
+
+  const { data: tablesData, loading, refetch } = useApi<TablesApiResponse>('/api/tables');
+  const { mutate: updateTableStatusAPI } = useApiMutation('/api/tables/status', 'PATCH');
 
   useEffect(() => {
     if (tablesData) {
-      tableStore.setTables(tablesData.tables);
+      setTables(tablesData.tables);
     }
-    tableStore.setLoading(loading);
-  }, [tablesData, loading]);
+    setLoading(loading);
+  }, [tablesData, loading, setTables, setLoading]);
 
-  const updateStatus = async (tableId: string, status: string) => {
-    const result = await updateTableStatus({ status });
-    if (result) {
-      tableStore.updateTableStatus(tableId, status as any);
+  const updateStatus = async (tableId: string, status: Table['status']) => {
+    // Optimistic update
+    updateTableStatus(tableId, status);
+    
+    try {
+      await updateTableStatusAPI({ tableId, status });
+      refetch();
+    } catch (error) {
+      // Revert on error
+      refetch();
+      throw error;
     }
   };
 
   return {
-    ...tableStore,
-    refetchTables: refetch,
+    tables,
+    isLoading,
+    availableTables: getAvailableTables(),
     updateStatus,
+    getTablesBySection,
+    getTableByNumber,
+    refetch,
   };
 }

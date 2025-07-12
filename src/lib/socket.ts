@@ -1,4 +1,3 @@
-
 import { io, Socket } from 'socket.io-client';
 
 export interface OrderUpdate {
@@ -47,16 +46,37 @@ class SocketManager {
   private reconnectTimeout: NodeJS.Timeout | null = null;
   private heartbeatInterval: NodeJS.Timeout | null = null;
 
+  // Get the correct socket URL
+  private getSocketUrl(): string {
+    // In development, use localhost
+    if (process.env.NODE_ENV === 'development') {
+      return 'http://localhost:3000';
+    }
+    
+    // In production, use the environment variable or current origin
+    return process.env.NEXT_PUBLIC_SOCKET_URL || 
+           (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000');
+  }
+
   // Initialize WebSocket connection
   async connect(restaurantId: string, authToken: string): Promise<SocketManager> {
+    console.log('🔌 Starting connection process...', { restaurantId, authToken });
+    
+    // Cleanup any existing connection
+    if (this.socket) {
+      console.log('🧹 Cleaning up existing connection');
+      this.disconnect();
+    }
+
     this.restaurantId = restaurantId;
     this.authToken = authToken;
 
     try {
-      console.log('🔌 Connecting to WebSocket server...', { restaurantId });
+      const socketUrl = this.getSocketUrl();
+      console.log('🔌 Connecting to WebSocket server...', { socketUrl, restaurantId });
 
-      // Initialize Socket.IO client
-      this.socket = io(process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:3000', {
+      // Initialize Socket.IO client with proper configuration
+      this.socket = io(socketUrl, {
         auth: {
           token: authToken,
           restaurantId: restaurantId,
@@ -65,32 +85,52 @@ class SocketManager {
         upgrade: true,
         timeout: 10000,
         forceNew: true,
+        reconnection: true,
+        reconnectionAttempts: 5,
+        reconnectionDelay: 1000,
+        reconnectionDelayMax: 5000,
       });
 
-      // Setup event listeners
+      // Setup event listeners BEFORE emitting join-restaurant
       this.setupEventListeners();
-
-      // Join restaurant room
-      this.socket.emit('join-restaurant', { restaurantId, authToken });
 
       return new Promise((resolve, reject) => {
         const timeout = setTimeout(() => {
+          console.error('❌ Connection timeout after 10 seconds');
           reject(new Error('Connection timeout'));
         }, 10000);
 
-        this.socket!.on('connect', () => {
+        // Wait for connection
+        this.socket!.once('connect', () => {
+          console.log('🔗 Socket connected, now joining restaurant...');
+          
+          // Now emit join-restaurant
+          this.socket!.emit('join-restaurant', { 
+            restaurantId, 
+            authToken 
+          });
+        });
+
+        // Wait for restaurant-joined confirmation
+        this.socket!.once('restaurant-joined', (data) => {
           clearTimeout(timeout);
           this.isConnected = true;
           this.reconnectAttempts = 0;
-          console.log('✅ WebSocket connected successfully');
+          console.log('✅ Successfully joined restaurant:', data);
           this.startHeartbeat();
           resolve(this);
         });
 
-        this.socket!.on('connect_error', (error) => {
+        this.socket!.once('connect_error', (error) => {
           clearTimeout(timeout);
           console.error('❌ WebSocket connection failed:', error);
           this.handleReconnection();
+          reject(error);
+        });
+
+        this.socket!.once('error', (error) => {
+          clearTimeout(timeout);
+          console.error('❌ WebSocket error during connection:', error);
           reject(error);
         });
       });
@@ -107,10 +147,8 @@ class SocketManager {
 
     // Connection events
     this.socket.on('connect', () => {
-      console.log('🔗 WebSocket connected');
-      this.isConnected = true;
-      this.reconnectAttempts = 0;
-      this.startHeartbeat();
+      console.log('🔗 WebSocket connected, ID:', this.socket?.id);
+      // Don't set isConnected here - wait for restaurant-joined
     });
 
     this.socket.on('disconnect', (reason) => {
@@ -132,7 +170,9 @@ class SocketManager {
 
     // Server events
     this.socket.on('restaurant-joined', (data) => {
-      console.log('🏢 Joined restaurant room:', data);
+      console.log('🏢 Successfully joined restaurant room:', data);
+      this.isConnected = true;
+      this.reconnectAttempts = 0;
     });
 
     this.socket.on('error', (error) => {
@@ -142,6 +182,15 @@ class SocketManager {
     // Keep-alive response
     this.socket.on('pong', () => {
       console.log('🏓 Heartbeat response received');
+    });
+
+    // Debug events
+    this.socket.on('client-joined', (data) => {
+      console.log('👋 Another client joined:', data);
+    });
+
+    this.socket.on('client-left', (data) => {
+      console.log('👋 A client left:', data);
     });
   }
 
@@ -284,12 +333,12 @@ class SocketManager {
 
   // Connection status methods
   isSocketConnected(): boolean {
-    return this.socket?.connected || false;
+    return this.socket?.connected && this.isConnected || false;
   }
 
   getConnectionStatus(): 'connected' | 'disconnected' | 'error' {
     if (!this.socket) return 'disconnected';
-    if (this.socket.connected) return 'connected';
+    if (this.socket.connected && this.isConnected) return 'connected';
     return 'disconnected';
   }
 
@@ -325,6 +374,7 @@ class SocketManager {
       reconnectAttempts: this.reconnectAttempts,
       hasSocket: !!this.socket,
       connectionStatus: this.getConnectionStatus(),
+      socketUrl: this.getSocketUrl(),
     };
   }
 }

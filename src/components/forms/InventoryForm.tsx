@@ -133,18 +133,18 @@ export default function InventoryForm({
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="quantity">Current Quantity</Label>
+              <Label htmlFor="currentStock">Current Stock</Label>
               <Input
-                id="quantity"
+                id="currentStock"
                 type="number"
                 step="0.01"
                 placeholder="0"
-                {...register("quantity", { valueAsNumber: true })}
+                {...register("currentStock", { valueAsNumber: true })}
                 disabled={isLoading}
               />
-              {errors.quantity && (
+              {errors.currentStock && (
                 <p className="text-sm text-red-600">
-                  {errors.quantity.message}
+                  {errors.currentStock.message}
                 </p>
               )}
             </div>
@@ -187,35 +187,35 @@ export default function InventoryForm({
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="reorderLevel">Reorder Level</Label>
+              <Label htmlFor="minStockLevel">Minimum Stock Level</Label>
               <Input
-                id="reorderLevel"
+                id="minStockLevel"
                 type="number"
                 step="0.01"
                 placeholder="0"
-                {...register("reorderLevel", { valueAsNumber: true })}
+                {...register("minStockLevel", { valueAsNumber: true })}
                 disabled={isLoading}
               />
-              {errors.reorderLevel && (
+              {errors.minStockLevel && (
                 <p className="text-sm text-red-600">
-                  {errors.reorderLevel.message}
+                  {errors.minStockLevel.message}
                 </p>
               )}
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="maxStock">Maximum Stock</Label>
+              <Label htmlFor="maxStockLevel">Maximum Stock Level</Label>
               <Input
-                id="maxStock"
+                id="maxStockLevel"
                 type="number"
                 step="0.01"
                 placeholder="0"
-                {...register("maxStock", { valueAsNumber: true })}
+                {...register("maxStockLevel", { valueAsNumber: true })}
                 disabled={isLoading}
               />
-              {errors.maxStock && (
+              {errors.maxStockLevel && (
                 <p className="text-sm text-red-600">
-                  {errors.maxStock.message}
+                  {errors.maxStockLevel.message}
                 </p>
               )}
             </div>
@@ -269,62 +269,16 @@ export default function InventoryForm({
             <h3 className="text-lg font-medium">Supplier Information</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="supplierName">Supplier Name</Label>
+                <Label htmlFor="supplier">Supplier (Optional)</Label>
                 <Input
-                  id="supplierName"
+                  id="supplier"
                   placeholder="Enter supplier name"
-                  {...register("supplierInfo.name")}
+                  {...register("supplier")}
                   disabled={isLoading}
                 />
-                {errors.supplierInfo?.name && (
+                {errors.supplier && (
                   <p className="text-sm text-red-600">
-                    {errors.supplierInfo.name.message}
-                  </p>
-                )}
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="supplierContact">Primary Contact</Label>
-                <Input
-                  id="supplierContact"
-                  placeholder="Contact person name"
-                  {...register("supplierInfo.contact")}
-                  disabled={isLoading}
-                />
-                {errors.supplierInfo?.contact && (
-                  <p className="text-sm text-red-600">
-                    {errors.supplierInfo.contact.message}
-                  </p>
-                )}
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="supplierEmail">Email (Optional)</Label>
-                <Input
-                  id="supplierEmail"
-                  type="email"
-                  placeholder="supplier@example.com"
-                  {...register("supplierInfo.email")}
-                  disabled={isLoading}
-                />
-                {errors.supplierInfo?.email && (
-                  <p className="text-sm text-red-600">
-                    {errors.supplierInfo.email.message}
-                  </p>
-                )}
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="supplierPhone">Phone (Optional)</Label>
-                <Input
-                  id="supplierPhone"
-                  placeholder="Phone number"
-                  {...register("supplierInfo.phone")}
-                  disabled={isLoading}
-                />
-                {errors.supplierInfo?.phone && (
-                  <p className="text-sm text-red-600">
-                    {errors.supplierInfo.phone.message}
+                    {errors.supplier.message}
                   </p>
                 )}
               </div>

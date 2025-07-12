@@ -12,14 +12,17 @@ export interface Notification {
 }
 
 export function useNotifications() {
-  const { data: notificationsData, loading, refetch } = useApi<{
+  // Poll notifications every 15 seconds
+  const { data, loading, refetch } = useApi<{
     notifications: Notification[];
     unreadCount: number;
-  }>('/api/notifications');
+  }>('/api/notifications', {
+    pollInterval: 15000 // Poll every 15 seconds for notifications
+  });
 
   return {
-    notifications: notificationsData?.notifications || [],
-    unreadCount: notificationsData?.unreadCount || 0,
+    notifications: data?.notifications || [],
+    unreadCount: data?.unreadCount || 0,
     isLoading: loading,
     refetch,
   };

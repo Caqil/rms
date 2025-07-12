@@ -1,62 +1,55 @@
-import { useState, useEffect } from 'react';
+import { useEffect } from 'react';
 import { useInventoryStore } from '@/stores/inventoryStore';
 import { useApi, useApiMutation } from './useApi';
 
 export function useInventory() {
-  const inventoryStore = useInventoryStore();
+  const store = useInventoryStore();
   
-  const { data: inventoryData, loading, refetch } = useApi<{
+  const { data, loading, refetch } = useApi<{
     items: any[];
     categories: string[];
     totalValue: number;
   }>('/api/inventory');
 
-  const { mutate: createInventoryItem, loading: creating } = useApiMutation('/api/inventory', 'POST');
-  const { mutate: updateInventoryItem, loading: updating } = useApiMutation('/api/inventory', 'PATCH');
-  const { mutate: deleteInventoryItem } = useApiMutation('/api/inventory', 'DELETE');
-  const { mutate: adjustInventoryStock } = useApiMutation('/api/inventory/adjust', 'POST');
+  const { mutate: createItem, loading: creating } = useApiMutation('/api/inventory', 'POST');
+  const { mutate: updateItem, loading: updating } = useApiMutation('/api/inventory', 'PATCH');
+  const { mutate: deleteItem } = useApiMutation('/api/inventory', 'DELETE');
+  const { mutate: adjustStock } = useApiMutation('/api/inventory/adjust', 'POST');
 
   useEffect(() => {
-    if (inventoryData) {
-      inventoryStore.setItems(inventoryData.items);
-      inventoryStore.setCategories(inventoryData.categories);
+    if (data) {
+      store.setItems(data.items);
+      store.setCategories(data.categories);
     }
-    inventoryStore.setLoading(loading);
-  }, [inventoryData, loading]);
+    store.setLoading(loading);
+  }, [data, loading]); // Fixed dependencies
 
-  // Get expiring items (within 7 days)
-  const expiringItems = inventoryStore.items.filter(item => {
-    if (!item.expirationDate) return false;
-    const daysUntilExpiry = Math.ceil((new Date(item.expirationDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
-    return daysUntilExpiry <= 7 && daysUntilExpiry >= 0;
-  });
-
-  const createItem = async (data: any) => {
-    const result = await createInventoryItem(data);
+  const createItemHandler = async (itemData: any) => {
+    const result = await createItem(itemData);
     if (result) {
       refetch();
     }
     return result;
   };
 
-  const updateItem = async (itemId: string, data: any) => {
-    const result = await updateInventoryItem({ itemId, ...data });
+  const updateItemHandler = async (itemId: string, itemData: any) => {
+    const result = await updateItem({ itemId, ...itemData });
     if (result) {
       refetch();
     }
     return result;
   };
 
-  const deleteItem = async (itemId: string) => {
-    const result = await deleteInventoryItem({ itemId });
+  const deleteItemHandler = async (itemId: string) => {
+    const result = await deleteItem({ itemId });
     if (result) {
       refetch();
     }
     return result;
   };
 
-  const adjustStock = async (itemId: string, adjustment: any) => {
-    const result = await adjustInventoryStock({ itemId, ...adjustment });
+  const adjustStockHandler = async (itemId: string, adjustment: any) => {
+    const result = await adjustStock({ itemId, ...adjustment });
     if (result) {
       refetch();
     }
@@ -64,22 +57,22 @@ export function useInventory() {
   };
 
   return {
-    items: inventoryStore.items,
-    categories: inventoryStore.categories,
-    selectedCategory: inventoryStore.selectedCategory,
-    searchQuery: inventoryStore.searchQuery,
-    isLoading: inventoryStore.isLoading,
-    filteredItems: inventoryStore.getFilteredItems(),
-    lowStockItems: inventoryStore.getLowStockItems(),
-    expiringItems,
-    totalValue: inventoryData?.totalValue || 0,
-    setSelectedCategory: inventoryStore.setSelectedCategory,
-    setSearchQuery: inventoryStore.setSearchQuery,
+    items: store.items,
+    categories: store.categories,
+    selectedCategory: store.selectedCategory,
+    searchQuery: store.searchQuery,
+    isLoading: store.isLoading,
+    filteredItems: store.getFilteredItems(),
+    lowStockItems: store.getLowStockItems(),
+    expiringItems: store.getExpiringItems(),
+    totalValue: data?.totalValue || 0,
+    setSelectedCategory: store.setSelectedCategory,
+    setSearchQuery: store.setSearchQuery,
     refetchInventory: refetch,
-    createItem,
-    updateItem,
-    deleteItem,
-    adjustStock,
+    createItem: createItemHandler,
+    updateItem: updateItemHandler,
+    deleteItem: deleteItemHandler,
+    adjustStock: adjustStockHandler,
     creating,
     updating,
   };

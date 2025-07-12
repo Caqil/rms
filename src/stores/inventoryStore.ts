@@ -4,17 +4,18 @@ interface InventoryItem {
   _id: string;
   itemName: string;
   category: string;
-  quantity: number;
+  currentStock: number;
+  minStockLevel: number;
+  maxStockLevel: number;
   unit: string;
   cost: number;
-  reorderLevel: number;
-  maxStock: number; // Added missing maxStock property
-  expirationDate?: Date;
-  supplierInfo: {
-    name: string;
-    contact: string;
-  };
-  isLowStock: boolean;
+  supplier?: string;
+  expirationDate?: string;
+  location?: string;
+  restaurantId: string;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
 }
 
 interface InventoryState {
@@ -23,15 +24,16 @@ interface InventoryState {
   selectedCategory: string | null;
   searchQuery: string;
   isLoading: boolean;
-  lowStockItems: InventoryItem[];
+  
+  // Actions
   setItems: (items: InventoryItem[]) => void;
   setCategories: (categories: string[]) => void;
   setSelectedCategory: (category: string | null) => void;
   setSearchQuery: (query: string) => void;
   setLoading: (loading: boolean) => void;
-  updateItemQuantity: (itemId: string, quantity: number) => void;
   getFilteredItems: () => InventoryItem[];
   getLowStockItems: () => InventoryItem[];
+  getExpiringItems: () => InventoryItem[];
 }
 
 export const useInventoryStore = create<InventoryState>((set, get) => ({
@@ -40,37 +42,22 @@ export const useInventoryStore = create<InventoryState>((set, get) => ({
   selectedCategory: null,
   searchQuery: '',
   isLoading: false,
-  lowStockItems: [],
-  
-  setItems: (items) => {
-    const lowStockItems = items.filter(item => item.quantity <= item.reorderLevel);
-    set({ items, lowStockItems });
-  },
-  
+
+  setItems: (items) => set({ items }),
   setCategories: (categories) => set({ categories }),
-  setSelectedCategory: (selectedCategory) => set({ selectedCategory }),
-  setSearchQuery: (searchQuery) => set({ searchQuery }),
-  setLoading: (isLoading) => set({ isLoading }),
-  
-  updateItemQuantity: (itemId, quantity) => {
-    set((state) => {
-      const updatedItems = state.items.map(item =>
-        item._id === itemId ? { ...item, quantity, isLowStock: quantity <= item.reorderLevel } : item
-      );
-      const lowStockItems = updatedItems.filter(item => item.quantity <= item.reorderLevel);
-      return { items: updatedItems, lowStockItems };
-    });
-  },
-  
+  setSelectedCategory: (category) => set({ selectedCategory: category }),
+  setSearchQuery: (query) => set({ searchQuery: query }),
+  setLoading: (loading) => set({ isLoading: loading }),
+
   getFilteredItems: () => {
     const { items, selectedCategory, searchQuery } = get();
     
-    let filtered = [...items];
-    
+    let filtered = items.filter(item => item.isActive);
+
     if (selectedCategory) {
       filtered = filtered.filter(item => item.category === selectedCategory);
     }
-    
+
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
       filtered = filtered.filter(item =>
@@ -78,12 +65,26 @@ export const useInventoryStore = create<InventoryState>((set, get) => ({
         item.category.toLowerCase().includes(query)
       );
     }
-    
+
     return filtered;
   },
-  
+
   getLowStockItems: () => {
-    const { items } = get();
-    return items.filter(item => item.quantity <= item.reorderLevel);
+    return get().items.filter(item => 
+      item.isActive && item.currentStock <= item.minStockLevel
+    );
+  },
+
+  getExpiringItems: () => {
+    const today = new Date();
+    const sevenDaysFromNow = new Date();
+    sevenDaysFromNow.setDate(today.getDate() + 7);
+    
+    return get().items.filter(item => {
+      if (!item.isActive || !item.expirationDate) return false;
+      
+      const expiryDate = new Date(item.expirationDate);
+      return expiryDate <= sevenDaysFromNow;
+    });
   },
 }));

@@ -275,7 +275,9 @@ export function OrderDetailsDialog({
                     >
                       <div className="flex-1">
                         <h4 className="font-medium">
-                          {item.menuItemId?.name || "Unknown Item"}
+                          {typeof item.menuItemId === 'object' && item.menuItemId?.name 
+                            ? item.menuItemId.name 
+                            : "Unknown Item"}
                         </h4>
                         <p className="text-sm text-muted-foreground">
                           Quantity: {item.quantity} ×{" "}

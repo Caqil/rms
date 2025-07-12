@@ -1,7 +1,6 @@
 import { create } from 'zustand';
-import { calculateOrderTotal } from '@/lib/utils';
 
-interface OrderItem {
+export interface OrderItem {
   menuItemId: string;
   name: string;
   price: number;
@@ -14,217 +13,262 @@ interface OrderItem {
   }>;
 }
 
-interface Discount {
+export interface CustomerInfo {
+  name?: string;
+  phone?: string;
+  email?: string;
+}
+
+export interface Discount {
   type: string;
   amount: number;
   description: string;
 }
 
+export interface CurrentOrder {
+  items: OrderItem[];
+  orderType: 'dine_in' | 'takeout' | 'delivery';
+  tableNumber?: string;
+  customerInfo?: CustomerInfo;
+  subtotal: number;
+  taxes: number;
+  discounts: Discount[];
+  tips: number;
+  total: number;
+  notes?: string;
+}
+
 interface OrderState {
-  currentOrder: {
-    items: OrderItem[];
-    tableNumber?: string;
-    customerInfo?: {
-      name?: string;
-      phone?: string;
-      email?: string;
-    };
-    orderType: 'dine_in' | 'takeout' | 'delivery';
-    subtotal: number;
-    taxes: number;
-    discounts: Discount[];
-    tips: number;
-    total: number;
-  };
-  orders: any[];
-  isLoading: boolean;
-  addItem: (item: OrderItem) => void;
+  currentOrder: CurrentOrder;
+  
+  // Actions
+  addItem: (item: Omit<OrderItem, 'quantity'> & { quantity?: number }) => void;
   removeItem: (menuItemId: string) => void;
   updateItemQuantity: (menuItemId: string, quantity: number) => void;
   updateItemInstructions: (menuItemId: string, instructions: string) => void;
+  setOrderType: (orderType: CurrentOrder['orderType']) => void;
   setTableNumber: (tableNumber: string) => void;
-  setCustomerInfo: (customerInfo: any) => void;
-  setOrderType: (orderType: 'dine_in' | 'takeout' | 'delivery') => void;
+  setCustomerInfo: (customerInfo: CustomerInfo) => void;
   addDiscount: (discount: Discount) => void;
   removeDiscount: (index: number) => void;
   setTips: (tips: number) => void;
+  setNotes: (notes: string) => void;
   calculateTotals: (taxRate: number) => void;
   clearOrder: () => void;
-  setOrders: (orders: any[]) => void;
-  setLoading: (loading: boolean) => void;
 }
 
+const initialOrder: CurrentOrder = {
+  items: [],
+  orderType: 'dine_in',
+  subtotal: 0,
+  taxes: 0,
+  discounts: [],
+  tips: 0,
+  total: 0,
+};
+
 export const useOrderStore = create<OrderState>((set, get) => ({
-  currentOrder: {
-    items: [],
-    orderType: 'dine_in',
-    subtotal: 0,
-    taxes: 0,
-    discounts: [],
-    tips: 0,
-    total: 0,
-  },
-  orders: [],
-  isLoading: false,
-  
-  addItem: (item) => {
-    set((state) => {
-      const existingItemIndex = state.currentOrder.items.findIndex(
-        (orderItem) => orderItem.menuItemId === item.menuItemId
+  currentOrder: initialOrder,
+
+  addItem: (newItem) => {
+    const { currentOrder } = get();
+    const existingItemIndex = currentOrder.items.findIndex(
+      item => item.menuItemId === newItem.menuItemId
+    );
+
+    let updatedItems;
+    if (existingItemIndex >= 0) {
+      // Update existing item
+      updatedItems = currentOrder.items.map((item, index) =>
+        index === existingItemIndex
+          ? { ...item, quantity: item.quantity + (newItem.quantity || 1) }
+          : item
       );
-      
-      if (existingItemIndex > -1) {
-        const updatedItems = [...state.currentOrder.items];
-        updatedItems[existingItemIndex].quantity += item.quantity;
-        return {
-          currentOrder: {
-            ...state.currentOrder,
-            items: updatedItems,
-          },
-        };
-      } else {
-        return {
-          currentOrder: {
-            ...state.currentOrder,
-            items: [...state.currentOrder.items, item],
-          },
-        };
-      }
-    });
-    get().calculateTotals(0.08);
-  },
-  
-  removeItem: (menuItemId) => {
-    set((state) => ({
-      currentOrder: {
-        ...state.currentOrder,
-        items: state.currentOrder.items.filter(item => item.menuItemId !== menuItemId),
-      },
-    }));
-    get().calculateTotals(0.08);
-  },
-  
-  updateItemQuantity: (menuItemId, quantity) => {
-    if (quantity <= 0) {
-      get().removeItem(menuItemId);
-      return;
+    } else {
+      // Add new item
+      updatedItems = [
+        ...currentOrder.items,
+        { ...newItem, quantity: newItem.quantity || 1 }
+      ];
     }
-    
-    set((state) => ({
-      currentOrder: {
-        ...state.currentOrder,
-        items: state.currentOrder.items.map(item =>
-          item.menuItemId === menuItemId ? { ...item, quantity } : item
-        ),
-      },
-    }));
-    get().calculateTotals(0.08);
-  },
-  
-  updateItemInstructions: (menuItemId, instructions) => {
-    set((state) => ({
-      currentOrder: {
-        ...state.currentOrder,
-        items: state.currentOrder.items.map(item =>
-          item.menuItemId === menuItemId ? { ...item, specialInstructions: instructions } : item
-        ),
-      },
-    }));
-  },
-  
-  setTableNumber: (tableNumber) => {
-    set((state) => ({
-      currentOrder: {
-        ...state.currentOrder,
-        tableNumber,
-      },
-    }));
-  },
-  
-  setCustomerInfo: (customerInfo) => {
-    set((state) => ({
-      currentOrder: {
-        ...state.currentOrder,
-        customerInfo,
-      },
-    }));
-  },
-  
-  setOrderType: (orderType) => {
-    set((state) => ({
-      currentOrder: {
-        ...state.currentOrder,
-        orderType,
-      },
-    }));
-  },
-  
-  addDiscount: (discount) => {
-    set((state) => ({
-      currentOrder: {
-        ...state.currentOrder,
-        discounts: [...state.currentOrder.discounts, discount],
-      },
-    }));
-    get().calculateTotals(0.08);
-  },
-  
-  removeDiscount: (index) => {
-    set((state) => ({
-      currentOrder: {
-        ...state.currentOrder,
-        discounts: state.currentOrder.discounts.filter((_, i) => i !== index),
-      },
-    }));
-    get().calculateTotals(0.08);
-  },
-  
-  setTips: (tips) => {
-    set((state) => ({
-      currentOrder: {
-        ...state.currentOrder,
-        tips,
-      },
-    }));
-  },
-  
-  calculateTotals: (taxRate) => {
-    set((state) => {
-      const discountAmount = state.currentOrder.discounts.reduce(
-        (sum, discount) => sum + discount.amount, 0
-      );
-      
-      const { subtotal, taxes, total } = calculateOrderTotal(
-        state.currentOrder.items,
-        taxRate,
-        discountAmount
-      );
-      
-      return {
-        currentOrder: {
-          ...state.currentOrder,
-          subtotal,
-          taxes,
-          total: total + state.currentOrder.tips,
-        },
-      };
-    });
-  },
-  
-  clearOrder: () => {
+
+    const subtotal = updatedItems.reduce(
+      (sum, item) => sum + (item.price * item.quantity),
+      0
+    );
+
     set({
       currentOrder: {
-        items: [],
-        orderType: 'dine_in',
-        subtotal: 0,
-        taxes: 0,
-        discounts: [],
-        tips: 0,
-        total: 0,
-      },
+        ...currentOrder,
+        items: updatedItems,
+        subtotal,
+        total: subtotal + currentOrder.taxes + currentOrder.tips - 
+               currentOrder.discounts.reduce((sum, d) => sum + d.amount, 0),
+      }
     });
   },
-  
-  setOrders: (orders) => set({ orders }),
-  setLoading: (isLoading) => set({ isLoading }),
+
+  removeItem: (menuItemId) => {
+    const { currentOrder } = get();
+    const updatedItems = currentOrder.items.filter(
+      item => item.menuItemId !== menuItemId
+    );
+
+    const subtotal = updatedItems.reduce(
+      (sum, item) => sum + (item.price * item.quantity),
+      0
+    );
+
+    set({
+      currentOrder: {
+        ...currentOrder,
+        items: updatedItems,
+        subtotal,
+        total: subtotal + currentOrder.taxes + currentOrder.tips - 
+               currentOrder.discounts.reduce((sum, d) => sum + d.amount, 0),
+      }
+    });
+  },
+
+  updateItemQuantity: (menuItemId, quantity) => {
+    const { currentOrder } = get();
+    const updatedItems = currentOrder.items.map(item =>
+      item.menuItemId === menuItemId ? { ...item, quantity } : item
+    );
+
+    const subtotal = updatedItems.reduce(
+      (sum, item) => sum + (item.price * item.quantity),
+      0
+    );
+
+    set({
+      currentOrder: {
+        ...currentOrder,
+        items: updatedItems,
+        subtotal,
+        total: subtotal + currentOrder.taxes + currentOrder.tips - 
+               currentOrder.discounts.reduce((sum, d) => sum + d.amount, 0),
+      }
+    });
+  },
+
+  updateItemInstructions: (menuItemId, instructions) => {
+    const { currentOrder } = get();
+    const updatedItems = currentOrder.items.map(item =>
+      item.menuItemId === menuItemId 
+        ? { ...item, specialInstructions: instructions } 
+        : item
+    );
+
+    set({
+      currentOrder: {
+        ...currentOrder,
+        items: updatedItems,
+      }
+    });
+  },
+
+  setOrderType: (orderType) => {
+    const { currentOrder } = get();
+    set({
+      currentOrder: {
+        ...currentOrder,
+        orderType,
+        // Clear table number if not dine-in
+        tableNumber: orderType === 'dine_in' ? currentOrder.tableNumber : undefined,
+      }
+    });
+  },
+
+  setTableNumber: (tableNumber) => {
+    const { currentOrder } = get();
+    set({
+      currentOrder: {
+        ...currentOrder,
+        tableNumber,
+      }
+    });
+  },
+
+  setCustomerInfo: (customerInfo) => {
+    const { currentOrder } = get();
+    set({
+      currentOrder: {
+        ...currentOrder,
+        customerInfo,
+      }
+    });
+  },
+
+  addDiscount: (discount) => {
+    const { currentOrder } = get();
+    const updatedDiscounts = [...currentOrder.discounts, discount];
+    const discountTotal = updatedDiscounts.reduce((sum, d) => sum + d.amount, 0);
+
+    set({
+      currentOrder: {
+        ...currentOrder,
+        discounts: updatedDiscounts,
+        total: currentOrder.subtotal + currentOrder.taxes + currentOrder.tips - discountTotal,
+      }
+    });
+  },
+
+  removeDiscount: (index) => {
+    const { currentOrder } = get();
+    const updatedDiscounts = currentOrder.discounts.filter((_, i) => i !== index);
+    const discountTotal = updatedDiscounts.reduce((sum, d) => sum + d.amount, 0);
+
+    set({
+      currentOrder: {
+        ...currentOrder,
+        discounts: updatedDiscounts,
+        total: currentOrder.subtotal + currentOrder.taxes + currentOrder.tips - discountTotal,
+      }
+    });
+  },
+
+  setTips: (tips) => {
+    const { currentOrder } = get();
+    const discountTotal = currentOrder.discounts.reduce((sum, d) => sum + d.amount, 0);
+
+    set({
+      currentOrder: {
+        ...currentOrder,
+        tips,
+        total: currentOrder.subtotal + currentOrder.taxes + tips - discountTotal,
+      }
+    });
+  },
+
+  setNotes: (notes) => {
+    const { currentOrder } = get();
+    set({
+      currentOrder: {
+        ...currentOrder,
+        notes,
+      }
+    });
+  },
+
+  calculateTotals: (taxRate) => {
+    const { currentOrder } = get();
+    const { subtotal, discounts, tips } = currentOrder;
+    
+    const taxes = subtotal * taxRate;
+    const discountTotal = discounts.reduce((sum, d) => sum + d.amount, 0);
+    const total = subtotal + taxes + tips - discountTotal;
+
+    set({
+      currentOrder: {
+        ...currentOrder,
+        taxes,
+        total: Math.max(0, total), // Ensure total is not negative
+      }
+    });
+  },
+
+  clearOrder: () => {
+    set({ currentOrder: initialOrder });
+  },
 }));

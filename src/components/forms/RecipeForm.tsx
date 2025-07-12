@@ -444,7 +444,7 @@ export default function RecipeForm({
                                   <div className="flex justify-between items-center w-full">
                                     <span>{item.itemName}</span>
                                     <span className="text-xs text-gray-500 ml-2">
-                                      {item.quantity} {item.unit} •{" "}
+                                      {item.currentStock} {item.unit} •{" "}
                                       {formatCurrency(item.cost)}/{item.unit}
                                     </span>
                                   </div>

@@ -59,15 +59,13 @@ export const createRestaurantSchema = z.object({
 });
 
 export const updateRestaurantSchema = createRestaurantSchema.partial();
-
-// Menu Item Validation Schemas
 export const createMenuItemSchema = z.object({
   name: z.string().min(2, 'Item name must be at least 2 characters'),
   description: z.string().min(10, 'Description must be at least 10 characters'),
   category: z.string().min(2, 'Category is required'),
   price: z.number().min(0.01, 'Price must be greater than 0'),
   cost: z.number().min(0, 'Cost must be 0 or greater'),
-  image: z.string().url().optional(),
+  image: z.string().optional(), // Made optional and removed URL validation for now
   availability: z.boolean(),
   preparationTime: z.number().min(1, 'Preparation time must be at least 1 minute'),
   allergens: z.array(z.string()).optional(),
@@ -82,12 +80,12 @@ export const createMenuItemSchema = z.object({
     ingredientId: z.string(),
     quantity: z.number().min(0.01),
     unit: z.string().min(1),
-  })),
+  })).optional().default([]), // Made optional with default
   seasonalAvailability: z.object({
     startDate: z.string().or(z.date()),
     endDate: z.string().or(z.date()),
   }).optional(),
-  restaurantId: z.string(),
+  restaurantId: z.string(), // Required and set by API
 });
 
 export const updateMenuItemSchema = createMenuItemSchema.partial();
@@ -150,19 +148,13 @@ export const updateOrderSchema = z.object({
 export const createInventorySchema = z.object({
   itemName: z.string().min(2, 'Item name must be at least 2 characters'),
   category: z.string().min(2, 'Category is required'),
-  quantity: z.number().min(0, 'Quantity must be 0 or greater'),
+  currentStock: z.number().min(0, 'Current stock must be 0 or greater'),
+  minStockLevel: z.number().min(0, 'Min stock level must be 0 or greater'),
+  maxStockLevel: z.number().min(1, 'Max stock level must be at least 1'),
   unit: z.string().min(1, 'Unit is required'),
   cost: z.number().min(0, 'Cost must be 0 or greater'),
-  supplierInfo: z.object({
-    name: z.string().min(2, 'Supplier name is required'),
-    contact: z.string().min(2, 'Supplier contact is required'),
-    email: z.string().email().optional(),
-    phone: z.string().optional(),
-  }),
+  supplier: z.string().optional(),
   expirationDate: z.string().or(z.date()).optional(),
-  reorderLevel: z.number().min(0, 'Reorder level must be 0 or greater'),
-  maxStock: z.number().min(1, 'Max stock must be at least 1'),
-  barcode: z.string().optional(),
   location: z.string().optional(),
   restaurantId: z.string(),
 });
@@ -194,7 +186,7 @@ export const createCustomerSchema = z.object({
     spiceLevel: z.number().min(0).max(10).optional(),
     notes: z.string().optional(),
   }).optional(),
-  marketingOptIn: z.boolean().default(false),
+  marketingOptIn: z.boolean(),
   restaurantId: z.string(),
 });
 

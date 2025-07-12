@@ -86,9 +86,11 @@ export default function OrdersPage({}: OrdersPageProps) {
   useEffect(() => {
     if (!socketManager.isConnected()) return;
 
-    const unsubscribeOrderUpdate = socketManager.onOrderStatusUpdate((update) => {
-      refetchOrders();
-    });
+    const unsubscribeOrderUpdate = socketManager.onOrderStatusUpdate(
+      (update) => {
+        refetchOrders();
+      }
+    );
 
     const unsubscribeNewOrder = socketManager.onNewOrder(() => {
       refetchOrders();
@@ -168,7 +170,9 @@ export default function OrdersPage({}: OrdersPageProps) {
       {/* Header */}
       <div className="flex flex-col space-y-4 md:flex-row md:items-center md:justify-between md:space-y-0">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Order Management</h1>
+          <h1 className="text-2xl font-bold tracking-tight">
+            Order Management
+          </h1>
           <p className="text-gray-500">
             Monitor and manage all restaurant orders in real-time
           </p>
@@ -181,10 +185,12 @@ export default function OrdersPage({}: OrdersPageProps) {
             onClick={() => refetchOrders()}
             disabled={isLoading}
           >
-            <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
+            <RefreshCw
+              className={`h-4 w-4 mr-2 ${isLoading ? "animate-spin" : ""}`}
+            />
             Refresh
           </Button>
-          
+
           <Button
             variant="outline"
             size="sm"
@@ -227,7 +233,11 @@ export default function OrdersPage({}: OrdersPageProps) {
       </div>
 
       {/* Order Tabs */}
-      <Tabs value={selectedTab} onValueChange={setSelectedTab} className="space-y-4">
+      <Tabs
+        value={selectedTab}
+        onValueChange={setSelectedTab}
+        className="space-y-4"
+      >
         <TabsList className="grid w-full grid-cols-5 lg:w-auto lg:grid-cols-5">
           <TabsTrigger value="all" className="flex items-center space-x-2">
             <span>All</span>
@@ -241,7 +251,10 @@ export default function OrdersPage({}: OrdersPageProps) {
               {tabCounts.pending}
             </Badge>
           </TabsTrigger>
-          <TabsTrigger value="preparing" className="flex items-center space-x-2">
+          <TabsTrigger
+            value="preparing"
+            className="flex items-center space-x-2"
+          >
             <span>Preparing</span>
             <Badge variant="secondary" className="ml-1">
               {tabCounts.preparing}
@@ -253,7 +266,10 @@ export default function OrdersPage({}: OrdersPageProps) {
               {tabCounts.ready}
             </Badge>
           </TabsTrigger>
-          <TabsTrigger value="completed" className="flex items-center space-x-2">
+          <TabsTrigger
+            value="completed"
+            className="flex items-center space-x-2"
+          >
             <span>Completed</span>
             <Badge variant="secondary" className="ml-1">
               {tabCounts.completed}
@@ -266,10 +282,15 @@ export default function OrdersPage({}: OrdersPageProps) {
           <ScrollArea className="h-[600px]">
             <div className="space-y-4">
               {getOrdersForTab(selectedTab)
-                .filter((order) =>
-                  order.orderNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                  order.customerInfo?.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                  order.tableNumber?.includes(searchQuery)
+                .filter(
+                  (order) =>
+                    order.orderNumber
+                      .toLowerCase()
+                      .includes(searchQuery.toLowerCase()) ||
+                    order.customerInfo?.name
+                      ?.toLowerCase()
+                      .includes(searchQuery.toLowerCase()) ||
+                    order.tableNumber?.includes(searchQuery)
                 )
                 .map((order) => (
                   <OrderCard
@@ -287,10 +308,12 @@ export default function OrdersPage({}: OrdersPageProps) {
                 <Card>
                   <CardContent className="p-8 text-center">
                     <Package className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-                    <h3 className="text-lg font-semibold mb-2">No orders found</h3>
+                    <h3 className="text-lg font-semibold mb-2">
+                      No orders found
+                    </h3>
                     <p className="text-gray-500">
-                      {selectedTab === "all" 
-                        ? "No orders have been placed yet." 
+                      {selectedTab === "all"
+                        ? "No orders have been placed yet."
                         : `No ${selectedTab} orders at the moment.`}
                     </p>
                   </CardContent>
@@ -303,9 +326,9 @@ export default function OrdersPage({}: OrdersPageProps) {
 
       {/* Order Details Modal/Sidebar would go here */}
       {selectedOrder && (
-        <OrderTimeline 
-          order={selectedOrder} 
-          onClose={() => setSelectedOrder(null)} 
+        <OrderTimeline
+          order={selectedOrder}
+          onClose={() => setSelectedOrder(null)}
         />
       )}
     </div>
@@ -374,11 +397,18 @@ function OrderCard({
 
               {/* Order Items Preview */}
               <div className="mb-4">
-                <p className="text-sm font-medium mb-2">Items ({order.items.length}):</p>
+                <p className="text-sm font-medium mb-2">
+                  Items ({order.items.length}):
+                </p>
                 <div className="space-y-1">
                   {order.items.slice(0, 3).map((item: any, index: number) => (
-                    <div key={index} className="flex justify-between text-sm text-gray-600">
-                      <span>{item.quantity}x {item.name}</span>
+                    <div
+                      key={index}
+                      className="flex justify-between text-sm text-gray-600"
+                    >
+                      <span>
+                        {item.quantity}x {item.name}
+                      </span>
                       <span>{formatCurrency(item.price * item.quantity)}</span>
                     </div>
                   ))}
