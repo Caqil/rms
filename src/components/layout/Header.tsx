@@ -1,4 +1,3 @@
-// src/components/layout/Header.tsx
 "use client";
 
 import { Search, Bell, Menu } from "lucide-react";
@@ -25,7 +24,8 @@ import {
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
 import { usePathname } from "next/navigation";
-import { useNotifications } from "@/hooks/useNotifications";
+// CHANGED: Import the new notification component
+import NotificationDropdown from "@/components/notifications/NotificationDropdown";
 
 interface HeaderProps {
   user: any;
@@ -33,11 +33,10 @@ interface HeaderProps {
 
 export function Header({ user }: HeaderProps) {
   const pathname = usePathname();
-  const { notifications, unreadCount } = useNotifications();
 
   // Generate breadcrumbs from pathname
   const generateBreadcrumbs = () => {
-    const segments = pathname.split("/").filter(Boolean);
+    const segments = (pathname ?? "").split("/").filter(Boolean);
     type Breadcrumb = { title: string; href: string; isLast: boolean };
     const breadcrumbs: Breadcrumb[] = [];
 
@@ -95,47 +94,10 @@ export function Header({ user }: HeaderProps) {
           />
         </div>
 
-        {/* Notifications */}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="relative">
-              <Bell className="h-4 w-4" />
-              {unreadCount > 0 && (
-                <Badge
-                  variant="destructive"
-                  className="absolute -top-1 -right-1 h-5 w-5 rounded-full p-0 text-xs flex items-center justify-center"
-                >
-                  {unreadCount > 99 ? "99+" : unreadCount}
-                </Badge>
-              )}
-              <span className="sr-only">Notifications</span>
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-80">
-            <DropdownMenuLabel>Notifications</DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            {notifications.length > 0 ? (
-              notifications.slice(0, 3).map((notification) => (
-                <DropdownMenuItem key={notification._id}>
-                  <div className="flex flex-col space-y-1">
-                    <p className="text-sm font-medium">{notification.title}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {notification.message}
-                    </p>
-                  </div>
-                </DropdownMenuItem>
-              ))
-            ) : (
-              <DropdownMenuItem>
-                <div className="text-sm text-muted-foreground">
-                  No new notifications
-                </div>
-              </DropdownMenuItem>
-            )}
-          </DropdownMenuContent>
-        </DropdownMenu>
+        {/* CHANGED: Replace the old notification dropdown with the new one */}
+        <NotificationDropdown />
 
-        {/* User Menu */}
+        {/* User Menu - Keep this unchanged */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" className="relative h-8 w-8 rounded-full">

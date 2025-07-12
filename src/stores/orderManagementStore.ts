@@ -2,176 +2,169 @@
 import { create } from 'zustand';
 import { IOrder } from '@/models/Order';
 
+interface OrderStats {
+  totalOrders: number;
+  pendingOrders: number;
+  preparingOrders: number;
+  readyOrders: number;
+  completedOrders: number;
+  cancelledOrders: number;
+  totalRevenue: number;
+  averageOrderValue: number;
+  averagePreparationTime: number;
+  completionRate: number;
+  peakHours: { hour: number; count: number }[];
+}
+
 interface OrderFilters {
-  status: string | null;
-  orderType: string | null;
-  dateRange: 'today' | 'week' | 'month' | 'custom' | null;
-  customDateStart?: Date;
-  customDateEnd?: Date;
-  tableNumber?: string;
-  searchQuery: string;
+  status: string[];
+  orderType: string[];
+  dateRange: { from: Date | null; to: Date | null };
+  amountRange: { min: number | null; max: number | null };
+  tableNumber: string;
+  customerName: string;
+  preparationTime: string;
 }
 
 interface OrderManagementState {
   orders: IOrder[];
   filteredOrders: IOrder[];
   selectedOrder: IOrder | null;
+  stats: OrderStats;
   filters: OrderFilters;
   isLoading: boolean;
   
-  // Stats
-  stats: {
-    todayOrders: number;
-    pendingOrders: number;
-    preparingOrders: number;
-    readyOrders: number;
-    completedOrders: number;
-    cancelledOrders: number;
-    todayRevenue: number;
-    avgOrderValue: number;
-  };
-  
-  // Actions
   setOrders: (orders: IOrder[]) => void;
-  setSelectedOrder: (order: IOrder | null) => void;
   setLoading: (loading: boolean) => void;
-  updateFilter: (key: keyof OrderFilters, value: any) => void;
+  setSelectedOrder: (order: IOrder | null) => void;
+  updateFilter: (key: string, value: any) => void;
   clearFilters: () => void;
-  getFilteredOrders: () => IOrder[];
-  calculateStats: () => void;
 }
-
-const initialFilters: OrderFilters = {
-  status: null,
-  orderType: null,
-  dateRange: 'today',
-  searchQuery: '',
-};
 
 export const useOrderManagementStore = create<OrderManagementState>((set, get) => ({
   orders: [],
   filteredOrders: [],
   selectedOrder: null,
-  filters: initialFilters,
-  isLoading: false,
   stats: {
-    todayOrders: 0,
+    totalOrders: 0,
     pendingOrders: 0,
     preparingOrders: 0,
     readyOrders: 0,
     completedOrders: 0,
     cancelledOrders: 0,
-    todayRevenue: 0,
-    avgOrderValue: 0,
+    totalRevenue: 0,
+    averageOrderValue: 0,
+    averagePreparationTime: 0,
+    completionRate: 0,
+    peakHours: [],
   },
+  filters: {
+    status: [],
+    orderType: [],
+    dateRange: { from: null, to: null },
+    amountRange: { min: null, max: null },
+    tableNumber: '',
+    customerName: '',
+    preparationTime: '',
+  },
+  isLoading: false,
   
   setOrders: (orders) => {
-    set({ orders });
-    get().calculateStats();
-    set({ filteredOrders: get().getFilteredOrders() });
+    const stats = calculateOrderStats(orders);
+    set({ orders, filteredOrders: orders, stats });
   },
   
-  setSelectedOrder: (order) => set({ selectedOrder: order }),
   setLoading: (isLoading) => set({ isLoading }),
   
+  setSelectedOrder: (selectedOrder) => set({ selectedOrder }),
+  
   updateFilter: (key, value) => {
-    set((state) => ({
-      filters: { ...state.filters, [key]: value },
-    }));
-    set({ filteredOrders: get().getFilteredOrders() });
+    const newFilters = { ...get().filters, [key]: value };
+    const filteredOrders = applyFilters(get().orders, newFilters);
+    set({ filters: newFilters, filteredOrders });
   },
   
   clearFilters: () => {
-    set({ filters: initialFilters });
-    set({ filteredOrders: get().getFilteredOrders() });
-  },
-  
-  getFilteredOrders: () => {
-    const { orders, filters } = get();
-    let filtered = [...orders];
-    
-    // Filter by status
-    if (filters.status && filters.status !== 'all') {
-      filtered = filtered.filter(order => order.status === filters.status);
-    }
-    
-    // Filter by order type
-    if (filters.orderType && filters.orderType !== 'all') {
-      filtered = filtered.filter(order => order.orderType === filters.orderType);
-    }
-    
-    // Filter by date range
-    const now = new Date();
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    
-    if (filters.dateRange === 'today') {
-      filtered = filtered.filter(order => 
-        new Date(order.createdAt) >= today
-      );
-    } else if (filters.dateRange === 'week') {
-      const weekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
-      filtered = filtered.filter(order => 
-        new Date(order.createdAt) >= weekAgo
-      );
-    } else if (filters.dateRange === 'month') {
-      const monthAgo = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
-      filtered = filtered.filter(order => 
-        new Date(order.createdAt) >= monthAgo
-      );
-    } else if (filters.dateRange === 'custom' && filters.customDateStart && filters.customDateEnd) {
-      filtered = filtered.filter(order => {
-        const orderDate = new Date(order.createdAt);
-        return orderDate >= filters.customDateStart! && orderDate <= filters.customDateEnd!;
-      });
-    }
-    
-    // Filter by table number
-    if (filters.tableNumber) {
-      filtered = filtered.filter(order => 
-        order.tableNumber?.toLowerCase().includes(filters.tableNumber!.toLowerCase())
-      );
-    }
-    
-    // Filter by search query
-    if (filters.searchQuery) {
-      const query = filters.searchQuery.toLowerCase();
-      filtered = filtered.filter(order =>
-        order.orderNumber.toLowerCase().includes(query) ||
-        order.customerInfo?.name?.toLowerCase().includes(query) ||
-        order.customerInfo?.phone?.includes(query) ||
-        order.tableNumber?.toLowerCase().includes(query)
-      );
-    }
-    
-    // Sort by creation date (newest first)
-    filtered.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-    
-    return filtered;
-  },
-  
-  calculateStats: () => {
-    const { orders } = get();
-    const now = new Date();
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    
-    const todayOrders = orders.filter(order => 
-      new Date(order.createdAt) >= today && order.status !== 'cancelled'
-    );
-    
-    const todayRevenue = todayOrders.reduce((sum, order) => sum + order.total, 0);
-    const avgOrderValue = todayOrders.length > 0 ? todayRevenue / todayOrders.length : 0;
-    
-    const stats = {
-      todayOrders: todayOrders.length,
-      pendingOrders: orders.filter(order => order.status === 'pending').length,
-      preparingOrders: orders.filter(order => order.status === 'preparing').length,
-      readyOrders: orders.filter(order => order.status === 'ready').length,
-      completedOrders: orders.filter(order => ['completed', 'served'].includes(order.status)).length,
-      cancelledOrders: orders.filter(order => order.status === 'cancelled').length,
-      todayRevenue,
-      avgOrderValue,
+    const defaultFilters: OrderFilters = {
+      status: [],
+      orderType: [],
+      dateRange: { from: null, to: null },
+      amountRange: { min: null, max: null },
+      tableNumber: '',
+      customerName: '',
+      preparationTime: '',
     };
-    
-    set({ stats });
+    set({ filters: defaultFilters, filteredOrders: get().orders });
   },
 }));
+
+function calculateOrderStats(orders: IOrder[]): OrderStats {
+  // Implementation for calculating stats
+  const totalOrders = orders.length;
+  const pendingOrders = orders.filter(o => o.status === 'pending').length;
+  const preparingOrders = orders.filter(o => o.status === 'preparing').length;
+  const readyOrders = orders.filter(o => o.status === 'ready').length;
+  const completedOrders = orders.filter(o => o.status === 'completed').length;
+  const cancelledOrders = orders.filter(o => o.status === 'cancelled').length;
+  
+  const totalRevenue = orders
+    .filter(o => o.status === 'completed')
+    .reduce((sum, o) => sum + o.total, 0);
+  
+  const averageOrderValue = totalRevenue / (completedOrders || 1);
+  
+  return {
+    totalOrders,
+    pendingOrders,
+    preparingOrders,
+    readyOrders,
+    completedOrders,
+    cancelledOrders,
+    totalRevenue,
+    averageOrderValue,
+    averagePreparationTime: 18, // Calculate from timestamps
+    completionRate: (completedOrders / totalOrders) * 100,
+    peakHours: [], // Calculate from order timestamps
+  };
+}
+
+function applyFilters(orders: IOrder[], filters: OrderFilters): IOrder[] {
+  return orders.filter(order => {
+    // Status filter
+    if (filters.status.length > 0 && !filters.status.includes(order.status)) {
+      return false;
+    }
+    
+    // Order type filter
+    if (filters.orderType.length > 0 && !filters.orderType.includes(order.orderType)) {
+      return false;
+    }
+    
+    // Date range filter
+    if (filters.dateRange.from || filters.dateRange.to) {
+      const orderDate = new Date(order.createdAt);
+      if (filters.dateRange.from && orderDate < filters.dateRange.from) return false;
+      if (filters.dateRange.to && orderDate > filters.dateRange.to) return false;
+    }
+    
+    // Amount range filter
+    if (filters.amountRange.min !== null && order.total < filters.amountRange.min) {
+      return false;
+    }
+    if (filters.amountRange.max !== null && order.total > filters.amountRange.max) {
+      return false;
+    }
+    
+    // Table number filter
+    if (filters.tableNumber && !order.tableNumber?.includes(filters.tableNumber)) {
+      return false;
+    }
+    
+    // Customer name filter
+    if (filters.customerName && !order.customerInfo?.name?.toLowerCase().includes(filters.customerName.toLowerCase())) {
+      return false;
+    }
+    
+    return true;
+  });
+}

@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, JSX } from "react";
+import { useSession } from "next-auth/react";
 import {
   Card,
   CardContent,
@@ -11,7 +12,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Select,
   SelectContent,
@@ -19,51 +19,51 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
-  ShoppingCart,
-  Plus,
-  Filter,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
   Search,
-  Eye,
-  Edit,
-  X,
+  Filter,
   RefreshCw,
-  Download,
-  Calendar,
+  MoreHorizontal,
   Clock,
-  User,
-  MapPin,
-  Phone,
-  DollarSign,
   CheckCircle,
   AlertCircle,
+  XCircle,
+  Eye,
+  Edit,
+  Trash2,
+  Download,
+  Calendar,
+  DollarSign,
+  TrendingUp,
+  Users,
   Package,
 } from "lucide-react";
 import { useOrderManagement } from "@/hooks/useOrderManagement";
+import { useRealTimeNotifications } from "@/hooks/useRealTimeNotifications";
 import { formatCurrency, formatDate, formatTime } from "@/lib/utils";
+import OrderFilters from "@/components/orders/OrderFilters";
+import OrderStats from "@/components/orders/OrderStats";
+import OrderTimeline from "@/components/orders/OrderTimeline";
 import { OrderActions } from "@/components/orders/OrderActions";
-import { OrderStatusBadge } from "@/components/orders/OrderStatusBadge";
 
-export default function OrdersPage() {
+interface OrdersPageProps {}
+
+export default function OrdersPage({}: OrdersPageProps) {
+  const { data: session } = useSession();
+  const [selectedTab, setSelectedTab] = useState("all");
+  const [searchQuery, setSearchQuery] = useState("");
   const [showFilters, setShowFilters] = useState(false);
-  const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
+  const [selectedOrder, setSelectedOrder] = useState<any>(null);
 
   const {
     orders,
@@ -71,396 +71,336 @@ export default function OrdersPage() {
     stats,
     filters,
     isLoading,
-    updateFilter,
-    clearFilters,
     handleStatusUpdate,
     handleCancelOrder,
+    handleUpdateOrder,
     refetchOrders,
+    updateFilter,
+    clearFilters,
+    getOrdersByStatus,
   } = useOrderManagement();
 
-  const statusCounts = {
-    pending: filteredOrders.filter((o) => o.status === "pending").length,
-    confirmed: filteredOrders.filter((o) => o.status === "confirmed").length,
-    preparing: filteredOrders.filter((o) => o.status === "preparing").length,
-    ready: filteredOrders.filter((o) => o.status === "ready").length,
-    served: filteredOrders.filter((o) => o.status === "served").length,
-    completed: filteredOrders.filter((o) => o.status === "completed").length,
-    cancelled: filteredOrders.filter((o) => o.status === "cancelled").length,
+  const { socketManager } = useRealTimeNotifications();
+
+  // Real-time updates
+  useEffect(() => {
+    if (!socketManager.isConnected()) return;
+
+    const unsubscribeOrderUpdate = socketManager.onOrderStatusUpdate((update) => {
+      refetchOrders();
+    });
+
+    const unsubscribeNewOrder = socketManager.onNewOrder(() => {
+      refetchOrders();
+    });
+
+    return () => {
+      unsubscribeOrderUpdate();
+      unsubscribeNewOrder();
+    };
+  }, [socketManager, refetchOrders]);
+
+  // Filter orders by tab
+  const getOrdersForTab = (tab: string) => {
+    switch (tab) {
+      case "pending":
+        return getOrdersByStatus("pending");
+      case "preparing":
+        return getOrdersByStatus("preparing");
+      case "ready":
+        return getOrdersByStatus("ready");
+      case "completed":
+        return getOrdersByStatus("completed");
+      default:
+        return filteredOrders;
+    }
   };
 
-  const handleQuickStatusUpdate = async (
-    orderId: string,
-    newStatus: string
-  ) => {
-    await handleStatusUpdate(orderId, newStatus);
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case "pending":
+        return "bg-yellow-500";
+      case "confirmed":
+        return "bg-blue-500";
+      case "preparing":
+        return "bg-orange-500";
+      case "ready":
+        return "bg-purple-500";
+      case "served":
+        return "bg-green-500";
+      case "completed":
+        return "bg-gray-500";
+      case "cancelled":
+        return "bg-red-500";
+      default:
+        return "bg-gray-400";
+    }
   };
 
-  if (isLoading) {
-    return (
-      <div className="space-y-6">
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          {[1, 2, 3, 4].map((i) => (
-            <Card key={i}>
-              <CardHeader className="pb-2">
-                <div className="h-4 w-20 bg-muted animate-pulse rounded"></div>
-              </CardHeader>
-              <CardContent>
-                <div className="h-8 w-12 bg-muted animate-pulse rounded"></div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      </div>
-    );
-  }
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case "pending":
+        return <Clock className="h-4 w-4" />;
+      case "confirmed":
+      case "preparing":
+        return <RefreshCw className="h-4 w-4" />;
+      case "ready":
+      case "served":
+      case "completed":
+        return <CheckCircle className="h-4 w-4" />;
+      case "cancelled":
+        return <XCircle className="h-4 w-4" />;
+      default:
+        return <AlertCircle className="h-4 w-4" />;
+    }
+  };
+
+  const tabCounts = {
+    all: orders.length,
+    pending: getOrdersByStatus("pending").length,
+    preparing: getOrdersByStatus("preparing").length,
+    ready: getOrdersByStatus("ready").length,
+    completed: getOrdersByStatus("completed").length,
+  };
 
   return (
-    <div className="space-y-6">
+    <div className="flex-1 space-y-6 p-4 md:p-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col space-y-4 md:flex-row md:items-center md:justify-between md:space-y-0">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">
-            Order Management
-          </h1>
-          <p className="text-muted-foreground">
-            Track and manage all restaurant orders
+          <h1 className="text-2xl font-bold tracking-tight">Order Management</h1>
+          <p className="text-gray-500">
+            Monitor and manage all restaurant orders in real-time
           </p>
         </div>
+
         <div className="flex items-center space-x-2">
-          <Button variant="outline" onClick={() => refetchOrders()}>
-            <RefreshCw className="mr-2 h-4 w-4" />
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => refetchOrders()}
+            disabled={isLoading}
+          >
+            <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
             Refresh
           </Button>
-          <Button variant="outline">
-            <Download className="mr-2 h-4 w-4" />
-            Export
+          
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowFilters(!showFilters)}
+          >
+            <Filter className="h-4 w-4 mr-2" />
+            Filters
           </Button>
-          <Button>
-            <Plus className="mr-2 h-4 w-4" />
-            New Order
+
+          <Button size="sm">
+            <Download className="h-4 w-4 mr-2" />
+            Export
           </Button>
         </div>
       </div>
 
-      {/* Statistics Cards */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              Today's Orders
-            </CardTitle>
-            <ShoppingCart className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.todayOrders}</div>
-            <p className="text-xs text-muted-foreground">
-              {stats.pendingOrders} pending, {stats.completedOrders} completed
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              Today's Revenue
-            </CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {formatCurrency(stats.todayRevenue)}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Avg: {formatCurrency(stats.avgOrderValue)} per order
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Active Orders</CardTitle>
-            <Clock className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-orange-600">
-              {stats.preparingOrders + stats.readyOrders}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              {stats.preparingOrders} preparing, {stats.readyOrders} ready
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              Completion Rate
-            </CardTitle>
-            <CheckCircle className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-600">
-              {stats.todayOrders > 0
-                ? Math.round((stats.completedOrders / stats.todayOrders) * 100)
-                : 0}
-              %
-            </div>
-            <p className="text-xs text-muted-foreground">
-              {stats.cancelledOrders} cancelled today
-            </p>
-          </CardContent>
-        </Card>
-      </div>
+      {/* Stats Cards */}
+      <OrderStats stats={stats} />
 
       {/* Filters */}
-      <Card>
-        <CardHeader className="pb-4">
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-lg">Filters</CardTitle>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setShowFilters(!showFilters)}
-            >
-              <Filter className="mr-2 h-4 w-4" />
-              {showFilters ? "Hide" : "Show"} Filters
-            </Button>
-          </div>
-        </CardHeader>
+      {showFilters && (
+        <OrderFilters
+          filters={filters}
+          onUpdateFilter={updateFilter}
+          onClearFilters={clearFilters}
+        />
+      )}
 
-        {showFilters && (
-          <CardContent className="space-y-4">
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
-              {/* Search */}
-              <div className="relative">
-                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search orders..."
-                  value={filters.searchQuery}
-                  onChange={(e) => updateFilter("searchQuery", e.target.value)}
-                  className="pl-8"
-                />
-              </div>
+      {/* Search */}
+      <div className="flex items-center space-x-4">
+        <div className="relative flex-1 max-w-sm">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <Input
+            placeholder="Search orders..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-10"
+          />
+        </div>
+      </div>
 
-              {/* Status Filter */}
-              <Select
-                value={filters.status || "all"}
-                onValueChange={(value) =>
-                  updateFilter("status", value === "all" ? null : value)
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="All Statuses" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Statuses</SelectItem>
-                  <SelectItem value="pending">
-                    Pending ({statusCounts.pending})
-                  </SelectItem>
-                  <SelectItem value="confirmed">
-                    Confirmed ({statusCounts.confirmed})
-                  </SelectItem>
-                  <SelectItem value="preparing">
-                    Preparing ({statusCounts.preparing})
-                  </SelectItem>
-                  <SelectItem value="ready">
-                    Ready ({statusCounts.ready})
-                  </SelectItem>
-                  <SelectItem value="served">
-                    Served ({statusCounts.served})
-                  </SelectItem>
-                  <SelectItem value="completed">
-                    Completed ({statusCounts.completed})
-                  </SelectItem>
-                  <SelectItem value="cancelled">
-                    Cancelled ({statusCounts.cancelled})
-                  </SelectItem>
-                </SelectContent>
-              </Select>
+      {/* Order Tabs */}
+      <Tabs value={selectedTab} onValueChange={setSelectedTab} className="space-y-4">
+        <TabsList className="grid w-full grid-cols-5 lg:w-auto lg:grid-cols-5">
+          <TabsTrigger value="all" className="flex items-center space-x-2">
+            <span>All</span>
+            <Badge variant="secondary" className="ml-1">
+              {tabCounts.all}
+            </Badge>
+          </TabsTrigger>
+          <TabsTrigger value="pending" className="flex items-center space-x-2">
+            <span>Pending</span>
+            <Badge variant="secondary" className="ml-1">
+              {tabCounts.pending}
+            </Badge>
+          </TabsTrigger>
+          <TabsTrigger value="preparing" className="flex items-center space-x-2">
+            <span>Preparing</span>
+            <Badge variant="secondary" className="ml-1">
+              {tabCounts.preparing}
+            </Badge>
+          </TabsTrigger>
+          <TabsTrigger value="ready" className="flex items-center space-x-2">
+            <span>Ready</span>
+            <Badge variant="secondary" className="ml-1">
+              {tabCounts.ready}
+            </Badge>
+          </TabsTrigger>
+          <TabsTrigger value="completed" className="flex items-center space-x-2">
+            <span>Completed</span>
+            <Badge variant="secondary" className="ml-1">
+              {tabCounts.completed}
+            </Badge>
+          </TabsTrigger>
+        </TabsList>
 
-              {/* Order Type Filter */}
-              <Select
-                value={filters.orderType || "all"}
-                onValueChange={(value) =>
-                  updateFilter("orderType", value === "all" ? null : value)
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="All Types" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Types</SelectItem>
-                  <SelectItem value="dine_in">Dine In</SelectItem>
-                  <SelectItem value="takeout">Takeout</SelectItem>
-                  <SelectItem value="delivery">Delivery</SelectItem>
-                </SelectContent>
-              </Select>
-
-              {/* Date Range Filter */}
-              <Select
-                value={filters.dateRange || "today"}
-                onValueChange={(value) => updateFilter("dateRange", value)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Date Range" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="today">Today</SelectItem>
-                  <SelectItem value="week">This Week</SelectItem>
-                  <SelectItem value="month">This Month</SelectItem>
-                  <SelectItem value="custom">Custom Range</SelectItem>
-                </SelectContent>
-              </Select>
-
-              {/* Table Number */}
-              <Input
-                placeholder="Table number..."
-                value={filters.tableNumber || ""}
-                onChange={(e) => updateFilter("tableNumber", e.target.value)}
-              />
-            </div>
-
-            <div className="flex items-center space-x-2">
-              <Button variant="outline" size="sm" onClick={clearFilters}>
-                Clear Filters
-              </Button>
-              <span className="text-sm text-muted-foreground">
-                Showing {filteredOrders.length} of {orders.length} orders
-              </span>
-            </div>
-          </CardContent>
-        )}
-      </Card>
-
-      {/* Orders Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Orders</CardTitle>
-          <CardDescription>
-            Manage and track order status and details
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
+        {/* Orders List */}
+        <TabsContent value={selectedTab}>
           <ScrollArea className="h-[600px]">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Order #</TableHead>
-                  <TableHead>Customer</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Items</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Total</TableHead>
-                  <TableHead>Time</TableHead>
-                  <TableHead>Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredOrders.map((order) => (
-                  <TableRow key={order._id} className="group">
-                    <TableCell className="font-medium">
-                      <div className="flex items-center space-x-2">
-                        <span>{order.orderNumber}</span>
-                        {order.tableNumber && (
-                          <Badge variant="outline" className="text-xs">
-                            Table {order.tableNumber}
-                          </Badge>
-                        )}
-                      </div>
-                    </TableCell>
-
-                    <TableCell>
-                      <div className="space-y-1">
-                        <div className="font-medium">
-                          {order.customerInfo?.name || "Guest"}
-                        </div>
-                        {order.customerInfo?.phone && (
-                          <div className="text-xs text-muted-foreground flex items-center">
-                            <Phone className="h-3 w-3 mr-1" />
-                            {order.customerInfo.phone}
-                          </div>
-                        )}
-                      </div>
-                    </TableCell>
-
-                    <TableCell>
-                      <Badge variant="outline" className="capitalize">
-                        {order.orderType.replace("_", " ")}
-                      </Badge>
-                    </TableCell>
-
-                    <TableCell>
-                      <div className="space-y-1">
-                        <div className="text-sm">
-                          {order.items.length} item
-                          {order.items.length !== 1 ? "s" : ""}
-                        </div>
-                        <div className="text-xs text-muted-foreground">
-                          {order.items.slice(0, 2).map((item, idx) => (
-                            <div key={idx}>
-                              {item.quantity}x {item.menuItemId?.name || "Item"}
-                            </div>
-                          ))}
-                          {order.items.length > 2 && (
-                            <div>+{order.items.length - 2} more</div>
-                          )}
-                        </div>
-                      </div>
-                    </TableCell>
-
-                    <TableCell>
-                      <OrderStatusBadge status={order.status} />
-                    </TableCell>
-
-                    <TableCell className="font-medium">
-                      {formatCurrency(order.total)}
-                    </TableCell>
-
-                    <TableCell>
-                      <div className="space-y-1">
-                        <div className="text-sm">
-                          {formatTime(order.timestamps.ordered)}
-                        </div>
-                        <div className="text-xs text-muted-foreground">
-                          {formatDate(order.timestamps.ordered)}
-                        </div>
-                      </div>
-                    </TableCell>
-
-                    <TableCell>
-                      <OrderActions
-                        order={order}
-                        onStatusUpdate={handleQuickStatusUpdate}
-                        onCancel={handleCancelOrder}
-                        onViewDetails={() => setSelectedOrderId(order._id)}
-                      />
-                    </TableCell>
-                  </TableRow>
+            <div className="space-y-4">
+              {getOrdersForTab(selectedTab)
+                .filter((order) =>
+                  order.orderNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                  order.customerInfo?.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                  order.tableNumber?.includes(searchQuery)
+                )
+                .map((order) => (
+                  <OrderCard
+                    key={order._id}
+                    order={order}
+                    onStatusUpdate={handleStatusUpdate}
+                    onCancel={handleCancelOrder}
+                    onViewDetails={() => setSelectedOrder(order)}
+                    getStatusColor={getStatusColor}
+                    getStatusIcon={getStatusIcon}
+                  />
                 ))}
-              </TableBody>
-            </Table>
 
-            {filteredOrders.length === 0 && (
-              <div className="text-center py-8">
-                <Package className="mx-auto h-12 w-12 text-muted-foreground" />
-                <h3 className="mt-4 text-lg font-medium">No orders found</h3>
-                <p className="mt-2 text-muted-foreground">
-                  No orders match the current filters.
-                </p>
-              </div>
-            )}
+              {getOrdersForTab(selectedTab).length === 0 && (
+                <Card>
+                  <CardContent className="p-8 text-center">
+                    <Package className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+                    <h3 className="text-lg font-semibold mb-2">No orders found</h3>
+                    <p className="text-gray-500">
+                      {selectedTab === "all" 
+                        ? "No orders have been placed yet." 
+                        : `No ${selectedTab} orders at the moment.`}
+                    </p>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
           </ScrollArea>
-        </CardContent>
-      </Card>
+        </TabsContent>
+      </Tabs>
 
-      {/* Order Details Dialog */}
-      {selectedOrderId && (
-        <OrderDetailsDialog
-          orderId={selectedOrderId}
-          open={!!selectedOrderId}
-          onClose={() => setSelectedOrderId(null)}
+      {/* Order Details Modal/Sidebar would go here */}
+      {selectedOrder && (
+        <OrderTimeline 
+          order={selectedOrder} 
+          onClose={() => setSelectedOrder(null)} 
         />
       )}
     </div>
+  );
+}
+
+interface OrderCardProps {
+  order: any;
+  onStatusUpdate: (orderId: string, status: string) => Promise<void>;
+  onCancel: (orderId: string, reason: string) => Promise<void>;
+  onViewDetails: () => void;
+  getStatusColor: (status: string) => string;
+  getStatusIcon: (status: string) => JSX.Element;
+}
+
+function OrderCard({
+  order,
+  onStatusUpdate,
+  onCancel,
+  onViewDetails,
+  getStatusColor,
+  getStatusIcon,
+}: OrderCardProps) {
+  return (
+    <Card className="transition-all hover:shadow-md">
+      <CardContent className="p-6">
+        <div className="flex items-start justify-between">
+          <div className="flex items-start space-x-4 flex-1">
+            {/* Order Info */}
+            <div className="flex-1">
+              <div className="flex items-center space-x-3 mb-2">
+                <h3 className="text-lg font-semibold">#{order.orderNumber}</h3>
+                <Badge className={`${getStatusColor(order.status)} text-white`}>
+                  <div className="flex items-center space-x-1">
+                    {getStatusIcon(order.status)}
+                    <span className="capitalize">{order.status}</span>
+                  </div>
+                </Badge>
+                <Badge variant="outline" className="capitalize">
+                  {order.orderType.replace("_", " ")}
+                </Badge>
+              </div>
+
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm text-gray-600 mb-4">
+                <div>
+                  <span className="font-medium">Customer:</span>
+                  <br />
+                  {order.customerInfo?.name || "Walk-in"}
+                </div>
+                <div>
+                  <span className="font-medium">Table:</span>
+                  <br />
+                  {order.tableNumber || "N/A"}
+                </div>
+                <div>
+                  <span className="font-medium">Total:</span>
+                  <br />
+                  {formatCurrency(order.total)}
+                </div>
+                <div>
+                  <span className="font-medium">Time:</span>
+                  <br />
+                  {formatTime(order.createdAt)}
+                </div>
+              </div>
+
+              {/* Order Items Preview */}
+              <div className="mb-4">
+                <p className="text-sm font-medium mb-2">Items ({order.items.length}):</p>
+                <div className="space-y-1">
+                  {order.items.slice(0, 3).map((item: any, index: number) => (
+                    <div key={index} className="flex justify-between text-sm text-gray-600">
+                      <span>{item.quantity}x {item.name}</span>
+                      <span>{formatCurrency(item.price * item.quantity)}</span>
+                    </div>
+                  ))}
+                  {order.items.length > 3 && (
+                    <p className="text-xs text-gray-500">
+                      +{order.items.length - 3} more items
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Actions */}
+          <OrderActions
+            order={order}
+            onStatusUpdate={onStatusUpdate}
+            onCancel={onCancel}
+            onViewDetails={onViewDetails}
+          />
+        </div>
+      </CardContent>
+    </Card>
   );
 }

@@ -1,4 +1,3 @@
-// src/app/(dashboard)/layout.tsx
 "use client";
 
 import { useSession } from "next-auth/react";
@@ -8,7 +7,9 @@ import { Toaster } from "sonner";
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AppSidebar } from "@/components/layout/AppSidebar";
-import { Header } from '../../components/layout/Header';
+import { Header } from "../../components/layout/Header";
+// ADDED: Import toast notifications
+import ToastNotifications from "@/components/notifications/ToastNotifications";
 
 export default function DashboardLayout({
   children,
@@ -48,6 +49,8 @@ export default function DashboardLayout({
         </SidebarInset>
       </div>
       <Toaster richColors />
+      {/* ADDED: Toast notifications component */}
+      <ToastNotifications />
     </SidebarProvider>
   );
 }

@@ -202,13 +202,14 @@ export function AppSidebar({ userRole }: AppSidebarProps) {
   const renderMenuSection = (items: any[], showBadges = false) => {
     return items.map((item) => {
       const isActive =
-        pathname === item.href || pathname.startsWith(`${item.href}/`);
+        pathname === item.href ||
+        (pathname && pathname.startsWith(`${item.href}/`));
       const badgeCount = showBadges ? getBadgeCount(item.name) : 0;
       const badgeVariant = getBadgeVariant(item.name, badgeCount);
 
       return (
         <SidebarMenuItem key={item.name}>
-          <SidebarMenuButton asChild isActive={isActive}>
+          <SidebarMenuButton asChild isActive={!!isActive}>
             <Link href={item.href} className="relative">
               <item.icon className="h-4 w-4" />
               <span>{item.name}</span>

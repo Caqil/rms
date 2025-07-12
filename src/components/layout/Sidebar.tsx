@@ -99,7 +99,8 @@ export default function Sidebar({
       <nav className="mt-5 flex-1 px-2 space-y-1 overflow-y-auto">
         {navigation.map((item) => {
           const isActive =
-            pathname === item.href || pathname.startsWith(`${item.href}/`);
+            pathname === item.href ||
+            (pathname && pathname.startsWith(`${item.href}/`));
           return (
             <Link
               key={item.name}
