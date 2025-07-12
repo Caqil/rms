@@ -1,19 +1,32 @@
 import { create } from 'zustand';
 
-interface KitchenOrder {
+export interface KitchenOrder {
   _id: string;
   orderNumber: string;
-  status: string;
-  items: any[];
   tableNumber?: string;
   customerName?: string;
-  orderType: string;
-  priority: string;
-  estimatedTime?: number;
-  actualTime?: number;
-  kitchenNotes?: string;
-  createdAt: string;
-  updatedAt: string;
+  items: Array<{
+    _id: string;
+    name: string;
+    quantity: number;
+    specialInstructions?: string;
+    preparationTime: number;
+    category: string;
+    allergens: string[];
+  }>;
+  status: "pending" | "confirmed" | "preparing" | "ready" | "served";
+  orderType: "dine_in" | "takeout" | "delivery";
+  priority: "low" | "normal" | "high" | "urgent";
+  estimatedTime: number;
+  actualStartTime?: Date;
+  targetCompletionTime?: Date;
+  timestamps: {
+    ordered: Date;
+    confirmed?: Date;
+    preparing?: Date;
+    ready?: Date;
+  };
+  isRushing?: boolean;
 }
 
 interface KitchenState {
@@ -25,8 +38,8 @@ interface KitchenState {
   setOrders: (orders: KitchenOrder[]) => void;
   setLoading: (loading: boolean) => void;
   setSelectedStation: (station: string | null) => void;
-  updateOrderStatus: (orderId: string, status: string) => void;
-  updateOrderPriority: (orderId: string, priority: string) => void;
+  updateOrderStatus: (orderId: string, status: "pending" | "confirmed" | "preparing" | "ready" | "served") => void;
+  updateOrderPriority: (orderId: string, priority: "low" | "normal" | "high" | "urgent") => void;
 }
 
 export const useKitchenStore = create<KitchenState>((set, get) => ({

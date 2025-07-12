@@ -40,6 +40,7 @@ export const PERMISSIONS = {
   REPORTS_READ: 'reports:read',
   REPORTS_EXPORT: 'reports:export',
   FINANCIALS_READ: 'financials:read',
+  ANALYTICS_READ: 'analytics:read',
   
   // Kitchen Management
   KITCHEN_READ: 'kitchen:read',
@@ -74,6 +75,7 @@ export const ROLE_PERMISSIONS = {
     PERMISSIONS.REPORTS_READ,
     PERMISSIONS.REPORTS_EXPORT,
     PERMISSIONS.FINANCIALS_READ,
+    PERMISSIONS.ANALYTICS_READ,
     PERMISSIONS.KITCHEN_READ,
     PERMISSIONS.KITCHEN_UPDATE,
   ],

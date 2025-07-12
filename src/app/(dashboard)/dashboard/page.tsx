@@ -56,6 +56,25 @@ export default function DashboardPage() {
   const { data: session } = useSession();
   const { stats, isLoading, refetch } = useDashboard();
 
+  // Provide default values to prevent undefined errors
+  const defaultStats = {
+    todayRevenue: 0,
+    revenueGrowth: 0,
+    todayOrders: 0,
+    orderGrowth: 0,
+    activeCustomers: 0,
+    totalCustomers: 0,
+    avgOrderValue: 0,
+    monthlyGrowth: 0,
+    pendingOrders: 0,
+    completedOrders: 0,
+    lowStockItems: 0,
+    chartData: [],
+    recentOrders: [],
+    topItems: [],
+    ...stats, // Spread actual stats to override defaults
+  };
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case "completed":
@@ -74,7 +93,10 @@ export default function DashboardPage() {
   const getStatusBadge = (
     status: string
   ): "secondary" | "destructive" | "outline" | "default" | null | undefined => {
-    const variants: Record<string, "secondary" | "destructive" | "outline" | "default"> = {
+    const variants: Record<
+      string,
+      "secondary" | "destructive" | "outline" | "default"
+    > = {
       completed: "default",
       preparing: "secondary",
       ready: "destructive",
@@ -141,18 +163,18 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {formatCurrency(stats.todayRevenue)}
+              {formatCurrency(defaultStats.todayRevenue)}
             </div>
             <p className="text-xs text-muted-foreground">
-              {stats.revenueGrowth >= 0 ? (
+              {defaultStats.revenueGrowth >= 0 ? (
                 <span className="text-green-600 inline-flex items-center">
                   <TrendingUp className="h-3 w-3 mr-1" />+
-                  {stats.revenueGrowth}%
+                  {defaultStats.revenueGrowth}%
                 </span>
               ) : (
                 <span className="text-red-600 inline-flex items-center">
                   <TrendingDown className="h-3 w-3 mr-1" />
-                  {stats.revenueGrowth}%
+                  {defaultStats.revenueGrowth}%
                 </span>
               )}{" "}
               from yesterday
@@ -166,17 +188,17 @@ export default function DashboardPage() {
             <ShoppingCart className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.todayOrders}</div>
+            <div className="text-2xl font-bold">{defaultStats.todayOrders}</div>
             <p className="text-xs text-muted-foreground">
-              {stats.orderGrowth >= 0 ? (
+              {defaultStats.orderGrowth >= 0 ? (
                 <span className="text-green-600 inline-flex items-center">
                   <TrendingUp className="h-3 w-3 mr-1" />+
-                  {stats.orderGrowth}%
+                  {defaultStats.orderGrowth}%
                 </span>
               ) : (
                 <span className="text-red-600 inline-flex items-center">
                   <TrendingDown className="h-3 w-3 mr-1" />
-                  {stats.orderGrowth}%
+                  {defaultStats.orderGrowth}%
                 </span>
               )}{" "}
               from yesterday
@@ -192,11 +214,13 @@ export default function DashboardPage() {
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.activeCustomers}</div>
+            <div className="text-2xl font-bold">
+              {defaultStats.activeCustomers}
+            </div>
             <p className="text-xs text-muted-foreground">
               <span className="text-blue-600 inline-flex items-center">
                 <Eye className="h-3 w-3 mr-1" />
-                {stats.totalCustomers} total
+                {defaultStats.totalCustomers} total
               </span>{" "}
               registered customers
             </p>
@@ -212,11 +236,12 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {formatCurrency(stats.avgOrderValue)}
+              {formatCurrency(defaultStats.avgOrderValue)}
             </div>
             <p className="text-xs text-muted-foreground">
               <span className="text-green-600 inline-flex items-center">
-                <TrendingUp className="h-3 w-3 mr-1" />+{stats.monthlyGrowth}%
+                <TrendingUp className="h-3 w-3 mr-1" />+
+                {defaultStats.monthlyGrowth}%
               </span>{" "}
               this month
             </p>
@@ -243,7 +268,7 @@ export default function DashboardPage() {
               </TabsList>
               <TabsContent value="revenue" className="h-[300px]">
                 <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={stats.chartData}>
+                  <LineChart data={defaultStats.chartData}>
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="name" />
                     <YAxis />
@@ -264,7 +289,7 @@ export default function DashboardPage() {
               </TabsContent>
               <TabsContent value="orders" className="h-[300px]">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={stats.chartData}>
+                  <BarChart data={defaultStats.chartData}>
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="name" />
                     <YAxis />
@@ -275,7 +300,7 @@ export default function DashboardPage() {
               </TabsContent>
               <TabsContent value="customers" className="h-[300px]">
                 <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={stats.chartData}>
+                  <LineChart data={defaultStats.chartData}>
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="name" />
                     <YAxis />
@@ -313,7 +338,7 @@ export default function DashboardPage() {
                 </div>
               </div>
               <div className="text-2xl font-bold text-orange-600">
-                {stats.pendingOrders}
+                {defaultStats.pendingOrders}
               </div>
             </div>
 
@@ -330,7 +355,7 @@ export default function DashboardPage() {
                 </div>
               </div>
               <div className="text-2xl font-bold text-green-600">
-                {stats.completedOrders}
+                {defaultStats.completedOrders}
               </div>
             </div>
 
@@ -347,7 +372,7 @@ export default function DashboardPage() {
                 </div>
               </div>
               <div className="text-2xl font-bold text-red-600">
-                {stats.lowStockItems}
+                {defaultStats.lowStockItems}
               </div>
             </div>
 
@@ -358,8 +383,11 @@ export default function DashboardPage() {
                   {Math.min(
                     100,
                     Math.round(
-                      (stats.todayOrders /
-                        Math.max(1, stats.todayOrders + stats.pendingOrders)) *
+                      (defaultStats.todayOrders /
+                        Math.max(
+                          1,
+                          defaultStats.todayOrders + defaultStats.pendingOrders
+                        )) *
                         100
                     )
                   )}
@@ -370,8 +398,11 @@ export default function DashboardPage() {
                 value={Math.min(
                   100,
                   Math.round(
-                    (stats.todayOrders /
-                      Math.max(1, stats.todayOrders + stats.pendingOrders)) *
+                    (defaultStats.todayOrders /
+                      Math.max(
+                        1,
+                        defaultStats.todayOrders + defaultStats.pendingOrders
+                      )) *
                       100
                   )
                 )}
@@ -391,7 +422,7 @@ export default function DashboardPage() {
             <CardDescription>Latest customer orders today</CardDescription>
           </CardHeader>
           <CardContent>
-            {stats.recentOrders.length > 0 ? (
+            {defaultStats.recentOrders.length > 0 ? (
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -402,7 +433,7 @@ export default function DashboardPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {stats.recentOrders.map((order) => (
+                  {defaultStats.recentOrders.map((order) => (
                     <TableRow key={order.id}>
                       <TableCell className="font-medium">{order.id}</TableCell>
                       <TableCell>
@@ -442,9 +473,9 @@ export default function DashboardPage() {
             <CardDescription>Best performing menu items today</CardDescription>
           </CardHeader>
           <CardContent>
-            {stats.topItems.length > 0 ? (
+            {defaultStats.topItems.length > 0 ? (
               <div className="space-y-4">
-                {stats.topItems.map((item, index) => (
+                {defaultStats.topItems.map((item, index) => (
                   <div
                     key={item._id}
                     className="flex items-center justify-between"

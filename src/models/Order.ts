@@ -154,7 +154,6 @@ const OrderSchema = new Schema({
 
 // Indexes for better query performance
 OrderSchema.index({ restaurantId: 1, status: 1 });
-OrderSchema.index({ orderNumber: 1 });
 OrderSchema.index({ createdAt: -1 });
 OrderSchema.index({ 'timestamps.ordered': -1 });
 OrderSchema.index({ tableNumber: 1 });

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, type SubmitHandler } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -52,13 +52,7 @@ export default function MenuItemForm({
   const [uploadingImage, setUploadingImage] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const {
-    register,
-    handleSubmit,
-    setValue,
-    watch,
-    formState: { errors },
-  } = useForm<CreateMenuItemInput>({
+  const form = useForm<CreateMenuItemInput>({
     resolver: zodResolver(createMenuItemSchema),
     defaultValues: {
       availability: true,
@@ -68,6 +62,14 @@ export default function MenuItemForm({
       ...initialData,
     },
   });
+
+  const {
+    register,
+    handleSubmit,
+    setValue,
+    watch,
+    formState: { errors },
+  } = form;
 
   const availability = watch("availability");
   const price = watch("price");
@@ -157,7 +159,7 @@ export default function MenuItemForm({
     }
   };
 
-  const onFormSubmit = async (data: CreateMenuItemInput) => {
+  const onFormSubmit: SubmitHandler<CreateMenuItemInput> = async (data) => {
     try {
       await onSubmit(data);
     } catch (error) {

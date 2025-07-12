@@ -104,9 +104,9 @@ export function useOrderManagement() {
   return {
     // Data
     orders: orderManagementStore.orders,
-    filteredOrders: orderManagementStore.filteredOrders,
+    filteredOrders: orderManagementStore.getFilteredOrders(),
     selectedOrder: orderManagementStore.selectedOrder,
-    stats: orderManagementStore.stats,
+    stats: orderManagementStore.getStats(),
     filters: orderManagementStore.filters,
     isLoading: orderManagementStore.isLoading,
     

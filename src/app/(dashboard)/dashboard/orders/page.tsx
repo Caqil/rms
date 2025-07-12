@@ -84,7 +84,7 @@ export default function OrdersPage({}: OrdersPageProps) {
 
   // Real-time updates
   useEffect(() => {
-    if (!socketManager.isConnected()) return;
+    if (!socketManager.isSocketConnected()) return;
 
     const unsubscribeOrderUpdate = socketManager.onOrderStatusUpdate(
       (update) => {

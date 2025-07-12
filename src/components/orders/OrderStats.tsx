@@ -47,7 +47,7 @@ export default function OrderStats({ stats }: OrderStatsProps) {
   };
 
   const formatPercentage = (percentage: number) => {
-    return `${percentage.toFixed(1)}%`;
+    return `${(percentage || 0).toFixed(1)}%`;
   };
 
   const getPreparationTimeStatus = (time: number) => {

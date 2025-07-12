@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useSession } from "next-auth/react";
 import {
   Card,
   CardContent,
@@ -12,7 +11,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Progress } from "@/components/ui/progress";
 import {
   Select,
   SelectContent,
@@ -26,6 +24,14 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import {
   BarChart,
   Bar,
@@ -43,38 +49,32 @@ import {
   Area,
 } from "recharts";
 import {
-  TrendingUp,
-  TrendingDown,
+  Download,
+  Calendar as CalendarIcon,
   DollarSign,
   ShoppingCart,
   Users,
-  Clock,
-  Target,
-  Calendar as CalendarIcon,
-  Download,
+  TrendingUp,
+  TrendingDown,
   RefreshCw,
-  Filter,
-  BarChart3,
-  PieChart as PieChartIcon,
-  Activity,
 } from "lucide-react";
-import { formatCurrency, cn } from "@/lib/utils";
-import { useAnalytics } from "@/hooks/useAnalytics";
+import { formatCurrency } from "@/lib/utils";
 import { format, subDays } from "date-fns";
+import { useAnalytics } from "@/hooks/useAnalytics";
 
 type DateRange = {
   from: Date;
   to: Date;
 };
 
-export default function AnalyticsPage() {
-  const { data: session } = useSession();
+export default function ReportsPage() {
   const [dateRange, setDateRange] = useState<DateRange>({
     from: subDays(new Date(), 30),
     to: new Date(),
   });
-  const [selectedPeriod, setSelectedPeriod] = useState<string>("7d");
+  const [selectedPeriod, setSelectedPeriod] = useState<string>("30d");
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
+  const [reportType, setReportType] = useState<string>("overview");
 
   const {
     analytics,
@@ -88,7 +88,6 @@ export default function AnalyticsPage() {
   } = useAnalytics(dateRange.from, dateRange.to);
 
   const periodOptions = [
-    { value: "1d", label: "Last 24 Hours" },
     { value: "7d", label: "Last 7 Days" },
     { value: "30d", label: "Last 30 Days" },
     { value: "90d", label: "Last 90 Days" },
@@ -101,9 +100,6 @@ export default function AnalyticsPage() {
     const now = new Date();
 
     switch (period) {
-      case "1d":
-        setDateRange({ from: subDays(now, 1), to: now });
-        break;
       case "7d":
         setDateRange({ from: subDays(now, 7), to: now });
         break;
@@ -127,6 +123,8 @@ export default function AnalyticsPage() {
     }
   };
 
+  const COLORS = ["#8884d8", "#82ca9d", "#ffc658", "#ff7300", "#0088fe"];
+
   if (isLoading) {
     return (
       <div className="space-y-6">
@@ -147,16 +145,14 @@ export default function AnalyticsPage() {
     );
   }
 
-  const COLORS = ["#8884d8", "#82ca9d", "#ffc658", "#ff7300", "#0088fe"];
-
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Analytics</h1>
+          <h1 className="text-3xl font-bold tracking-tight">Reports</h1>
           <p className="text-muted-foreground">
-            Comprehensive insights into your restaurant performance
+            Comprehensive business reports and insights
           </p>
         </div>
 
@@ -250,7 +246,7 @@ export default function AnalyticsPage() {
         </div>
       </div>
 
-      {/* Key Metrics */}
+      {/* Key Metrics Summary */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -308,10 +304,8 @@ export default function AnalyticsPage() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              Avg Order Value
-            </CardTitle>
-            <Target className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium">Avg Order Value</CardTitle>
+            <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
@@ -337,9 +331,7 @@ export default function AnalyticsPage() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              Customer Count
-            </CardTitle>
+            <CardTitle className="text-sm font-medium">Total Customers</CardTitle>
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -365,23 +357,23 @@ export default function AnalyticsPage() {
         </Card>
       </div>
 
-      {/* Analytics Tabs */}
-      <Tabs defaultValue="revenue" className="space-y-4">
+      {/* Report Types */}
+      <Tabs value={reportType} onValueChange={setReportType} className="space-y-4">
         <TabsList className="grid w-full grid-cols-5">
-          <TabsTrigger value="revenue">Revenue</TabsTrigger>
-          <TabsTrigger value="orders">Orders</TabsTrigger>
-          <TabsTrigger value="customers">Customers</TabsTrigger>
-          <TabsTrigger value="performance">Performance</TabsTrigger>
-          <TabsTrigger value="insights">Insights</TabsTrigger>
+          <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="sales">Sales</TabsTrigger>
+          <TabsTrigger value="inventory">Inventory</TabsTrigger>
+          <TabsTrigger value="staff">Staff</TabsTrigger>
+          <TabsTrigger value="customer">Customer</TabsTrigger>
         </TabsList>
 
-        {/* Revenue Analytics */}
-        <TabsContent value="revenue" className="space-y-4">
+        {/* Overview Report */}
+        <TabsContent value="overview" className="space-y-4">
           <div className="grid gap-4 md:grid-cols-2">
             <Card>
               <CardHeader>
                 <CardTitle>Revenue Trend</CardTitle>
-                <CardDescription>Daily revenue over time</CardDescription>
+                <CardDescription>Daily revenue over selected period</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="h-80">
@@ -411,8 +403,33 @@ export default function AnalyticsPage() {
 
             <Card>
               <CardHeader>
+                <CardTitle>Order Volume</CardTitle>
+                <CardDescription>Daily orders over selected period</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="h-80">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={orderData}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="date" />
+                      <YAxis />
+                      <Tooltip />
+                      <Bar dataKey="orders" fill="hsl(var(--primary))" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        {/* Sales Report */}
+        <TabsContent value="sales" className="space-y-4">
+          <div className="grid gap-4 md:grid-cols-2">
+            <Card>
+              <CardHeader>
                 <CardTitle>Revenue by Category</CardTitle>
-                <CardDescription>Breakdown by menu categories</CardDescription>
+                <CardDescription>Sales breakdown by menu categories</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="h-80">
@@ -440,24 +457,35 @@ export default function AnalyticsPage() {
                     </PieChart>
                   </ResponsiveContainer>
                 </div>
-                <div className="mt-4 space-y-2">
-                  {analytics.revenueByCategory?.map((item, index) => (
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Top Selling Items</CardTitle>
+                <CardDescription>Best performing menu items</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {analytics.topSellingItems?.slice(0, 5).map((item, index) => (
                     <div
                       key={item.name}
                       className="flex items-center justify-between"
                     >
                       <div className="flex items-center">
-                        <div
-                          className="w-3 h-3 rounded-full mr-2"
-                          style={{
-                            backgroundColor: COLORS[index % COLORS.length],
-                          }}
-                        />
-                        <span className="text-sm">{item.name}</span>
+                        <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center mr-3">
+                          <span className="text-sm font-medium">{index + 1}</span>
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium">{item.name}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {item.quantity} sold
+                          </p>
+                        </div>
                       </div>
-                      <span className="text-sm font-medium">
-                        {formatCurrency(item.value)}
-                      </span>
+                      <Badge variant="outline">
+                        {formatCurrency(item.revenue)}
+                      </Badge>
                     </div>
                   ))}
                 </div>
@@ -466,60 +494,66 @@ export default function AnalyticsPage() {
           </div>
         </TabsContent>
 
-        {/* Orders Analytics */}
-        <TabsContent value="orders" className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-2">
-            <Card>
-              <CardHeader>
-                <CardTitle>Order Volume</CardTitle>
-                <CardDescription>Number of orders over time</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="h-80">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={orderData}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="date" />
-                      <YAxis />
-                      <Tooltip />
-                      <Bar dataKey="orders" fill="hsl(var(--primary))" />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Order Status Distribution</CardTitle>
-                <CardDescription>Current order statuses</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {analytics.ordersByStatus?.map((status) => (
-                    <div key={status.name} className="space-y-2">
-                      <div className="flex justify-between">
-                        <span className="text-sm font-medium">
-                          {status.name}
-                        </span>
-                        <span className="text-sm text-muted-foreground">
-                          {status.count} orders
-                        </span>
-                      </div>
-                      <Progress
-                        value={(status.count / analytics.totalOrders) * 100}
-                        className="h-2"
-                      />
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+        {/* Inventory Report */}
+        <TabsContent value="inventory" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Inventory Status</CardTitle>
+              <CardDescription>Current inventory levels and alerts</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <p className="text-muted-foreground">
+                Inventory reporting functionality will be implemented when inventory data is available.
+              </p>
+            </CardContent>
+          </Card>
         </TabsContent>
 
-        {/* Customer Analytics */}
-        <TabsContent value="customers" className="space-y-4">
+        {/* Staff Report */}
+        <TabsContent value="staff" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Staff Performance</CardTitle>
+              <CardDescription>Top performing staff members</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Staff Member</TableHead>
+                    <TableHead>Orders Processed</TableHead>
+                    <TableHead>Revenue Generated</TableHead>
+                    <TableHead>Performance</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {performanceMetrics.topStaff?.map((staff, index) => (
+                    <TableRow key={staff.name}>
+                      <TableCell>
+                        <div className="flex items-center">
+                          <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center mr-3">
+                            <span className="text-sm font-medium">{index + 1}</span>
+                          </div>
+                          <span className="font-medium">{staff.name}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell>{staff.orders}</TableCell>
+                      <TableCell>{formatCurrency(staff.revenue)}</TableCell>
+                      <TableCell>
+                        <Badge variant={index < 3 ? "default" : "secondary"}>
+                          {index < 3 ? "Excellent" : "Good"}
+                        </Badge>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Customer Report */}
+        <TabsContent value="customer" className="space-y-4">
           <div className="grid gap-4 md:grid-cols-2">
             <Card>
               <CardHeader>
@@ -555,187 +589,33 @@ export default function AnalyticsPage() {
             <Card>
               <CardHeader>
                 <CardTitle>Customer Metrics</CardTitle>
-                <CardDescription>
-                  Key customer performance indicators
-                </CardDescription>
+                <CardDescription>Key customer performance indicators</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="flex justify-between items-center">
-                  <span className="text-sm font-medium">
-                    Customer Retention Rate
-                  </span>
+                  <span className="text-sm font-medium">Customer Retention Rate</span>
                   <Badge variant="secondary">
                     {analytics.customerRetentionRate}%
                   </Badge>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-sm font-medium">
-                    Avg Orders per Customer
-                  </span>
+                  <span className="text-sm font-medium">Avg Orders per Customer</span>
                   <Badge variant="secondary">
                     {analytics.avgOrdersPerCustomer}
                   </Badge>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-sm font-medium">
-                    Customer Lifetime Value
-                  </span>
+                  <span className="text-sm font-medium">Customer Lifetime Value</span>
                   <Badge variant="secondary">
                     {formatCurrency(analytics.customerLifetimeValue)}
                   </Badge>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-sm font-medium">
-                    Repeat Purchase Rate
-                  </span>
+                  <span className="text-sm font-medium">Repeat Purchase Rate</span>
                   <Badge variant="secondary">
                     {analytics.repeatPurchaseRate}%
                   </Badge>
                 </div>
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-
-        {/* Performance Analytics */}
-        <TabsContent value="performance" className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-3">
-            <Card>
-              <CardHeader>
-                <CardTitle>Kitchen Performance</CardTitle>
-                <CardDescription>Average preparation times</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm">Average Prep Time</span>
-                  <span className="font-medium">
-                    {performanceMetrics.avgPrepTime} min
-                  </span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm">On-Time Delivery</span>
-                  <span className="font-medium">
-                    {performanceMetrics.onTimeDeliveryRate}%
-                  </span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm">Order Accuracy</span>
-                  <span className="font-medium">
-                    {performanceMetrics.orderAccuracy}%
-                  </span>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Peak Hours</CardTitle>
-                <CardDescription>Busiest times of day</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="h-60">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={performanceMetrics.peakHours}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="hour" />
-                      <YAxis />
-                      <Tooltip />
-                      <Bar dataKey="orders" fill="hsl(var(--primary))" />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Staff Performance</CardTitle>
-                <CardDescription>Top performing staff members</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {performanceMetrics.topStaff?.map((staff, index) => (
-                  <div
-                    key={staff.name}
-                    className="flex items-center justify-between"
-                  >
-                    <div className="flex items-center">
-                      <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center mr-3">
-                        <span className="text-sm font-medium">{index + 1}</span>
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium">{staff.name}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {staff.orders} orders
-                        </p>
-                      </div>
-                    </div>
-                    <Badge variant="outline">
-                      {formatCurrency(staff.revenue)}
-                    </Badge>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-
-        {/* Insights */}
-        <TabsContent value="insights" className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-2">
-            <Card>
-              <CardHeader>
-                <CardTitle>Top Selling Items</CardTitle>
-                <CardDescription>Most popular menu items</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {analytics.topSellingItems?.map((item, index) => (
-                  <div
-                    key={item.name}
-                    className="flex items-center justify-between"
-                  >
-                    <div className="flex items-center">
-                      <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center mr-3">
-                        <span className="text-sm font-medium">{index + 1}</span>
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium">{item.name}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {item.quantity} sold
-                        </p>
-                      </div>
-                    </div>
-                    <Badge variant="outline">
-                      {formatCurrency(item.revenue)}
-                    </Badge>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Key Insights</CardTitle>
-                <CardDescription>AI-powered business insights</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {analytics.insights?.map((insight, index) => (
-                  <div key={index} className="p-3 rounded-lg border">
-                    <div className="flex items-center mb-2">
-                      <Activity className="h-4 w-4 text-primary mr-2" />
-                      <span className="text-sm font-medium">
-                        {insight.title}
-                      </span>
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      {insight.description}
-                    </p>
-                    {insight.action && (
-                      <Button variant="outline" size="sm" className="mt-2">
-                        {insight.action}
-                      </Button>
-                    )}
-                  </div>
-                ))}
               </CardContent>
             </Card>
           </div>

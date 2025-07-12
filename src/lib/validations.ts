@@ -80,7 +80,7 @@ export const createMenuItemSchema = z.object({
     ingredientId: z.string(),
     quantity: z.number().min(0.01),
     unit: z.string().min(1),
-  })).optional().default([]), // Made optional with default
+  })).optional(), // Made optional
   seasonalAvailability: z.object({
     startDate: z.string().or(z.date()),
     endDate: z.string().or(z.date()),
@@ -156,6 +156,7 @@ export const createInventorySchema = z.object({
   supplier: z.string().optional(),
   expirationDate: z.string().or(z.date()).optional(),
   location: z.string().optional(),
+  barcode: z.string().optional(),
   restaurantId: z.string(),
 });
 

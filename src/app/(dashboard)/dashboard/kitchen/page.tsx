@@ -30,35 +30,7 @@ import {
 } from "lucide-react";
 import { formatTime } from "@/lib/utils";
 import { useKitchenOrders } from "@/hooks/useKitchenOrders";
-
-interface KitchenOrder {
-  _id: string;
-  orderNumber: string;
-  tableNumber?: string;
-  customerName?: string;
-  items: Array<{
-    _id: string;
-    name: string;
-    quantity: number;
-    specialInstructions?: string;
-    preparationTime: number;
-    category: string;
-    allergens: string[];
-  }>;
-  status: "pending" | "confirmed" | "preparing" | "ready" | "served";
-  orderType: "dine_in" | "takeout" | "delivery";
-  priority: "low" | "normal" | "high" | "urgent";
-  estimatedTime: number;
-  actualStartTime?: Date;
-  targetCompletionTime?: Date;
-  timestamps: {
-    ordered: Date;
-    confirmed?: Date;
-    preparing?: Date;
-    ready?: Date;
-  };
-  isRushing?: boolean;
-}
+import { KitchenOrder } from "@/stores/kitchenStore";
 
 export default function KitchenDisplayPage() {
   const { data: session } = useSession();

@@ -1,9 +1,28 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getToken } from 'next-auth/jwt';
 import { connectToDatabase } from '@/lib/db';
-import User from '@/models/User';
-import { createUserSchema, updateUserSchema, paginationSchema } from '@/lib/validations';
+import Customer from '@/models/Customer';
 import { PERMISSIONS, hasPermission } from '@/lib/permissions';
+import { z } from 'zod';
+
+const createCustomerSchema = z.object({
+  name: z.string().min(1),
+  email: z.string().email().optional(),
+  phone: z.string().optional(),
+  address: z.object({
+    street: z.string().optional(),
+    city: z.string().optional(),
+    state: z.string().optional(),
+    zipCode: z.string().optional(),
+  }).optional(),
+  dateOfBirth: z.string().optional(),
+  preferences: z.object({
+    dietaryRestrictions: z.array(z.string()).optional(),
+    spiceLevel: z.number().min(0).max(10).optional(),
+    notes: z.string().optional(),
+  }).optional(),
+  marketingOptIn: z.boolean().optional(),
+});
 
 export async function GET(request: NextRequest) {
   try {
@@ -16,7 +35,7 @@ export async function GET(request: NextRequest) {
     }
 
     const userPermissions = token.permissions as string[] || [];
-    if (!hasPermission(userPermissions, PERMISSIONS.USER_READ)) {
+    if (!hasPermission(userPermissions, PERMISSIONS.CUSTOMER_READ)) {
       return NextResponse.json(
         { success: false, message: 'Insufficient permissions' },
         { status: 403 }
@@ -24,45 +43,53 @@ export async function GET(request: NextRequest) {
     }
 
     const { searchParams } = new URL(request.url);
-    const queryParams = Object.fromEntries(searchParams.entries());
-    
-    // Parse pagination and filter parameters
-    const { page, limit, sortBy, sortOrder } = paginationSchema.parse({
-      page: queryParams.page ? parseInt(queryParams.page) : 1,
-      limit: queryParams.limit ? parseInt(queryParams.limit) : 10,
-      sortBy: queryParams.sortBy || 'createdAt',
-      sortOrder: queryParams.sortOrder || 'desc',
-    });
+    const search = searchParams.get('search');
+    const status = searchParams.get('status');
+    const page = parseInt(searchParams.get('page') || '1');
+    const limit = parseInt(searchParams.get('limit') || '10');
 
     await connectToDatabase();
 
     // Build query
     const query: any = {};
-    if (queryParams.role) query.role = queryParams.role;
-    if (queryParams.restaurantId) query.restaurantId = queryParams.restaurantId;
-    if (queryParams.isActive !== undefined) query.isActive = queryParams.isActive === 'true';
-    if (queryParams.search) {
+    
+    // Filter by restaurant
+    if (token.restaurantId) {
+      query.restaurantId = token.restaurantId;
+    }
+    
+    // Filter by search term
+    if (search) {
+      const searchRegex = new RegExp(search, 'i');
       query.$or = [
-        { name: { $regex: queryParams.search, $options: 'i' } },
-        { email: { $regex: queryParams.search, $options: 'i' } },
+        { name: searchRegex },
+        { email: searchRegex },
+        { phone: searchRegex },
       ];
     }
+    
+    // Filter by status
+    if (status && status !== 'all') {
+      if (status === 'active') {
+        query.isActive = true;
+      } else if (status === 'inactive') {
+        query.isActive = false;
+      } else if (status === 'vip') {
+        query.loyaltyPoints = { $gte: 1000 };
+      }
+    }
 
-    // Get total count for pagination
-    const total = await User.countDocuments(query);
-
-    // Get users with pagination
-    const users = await User.find(query)
-      .select('-password')
-      .populate('restaurantId', 'name')
-      .sort({ [sortBy as string]: sortOrder === 'asc' ? 1 : -1 })
+    const total = await Customer.countDocuments(query);
+    const customers = await Customer.find(query)
+      .populate('orderHistory', 'total createdAt')
+      .sort({ createdAt: -1 })
       .skip((page - 1) * limit)
       .limit(limit);
 
     return NextResponse.json({
       success: true,
       data: {
-        users,
+        customers,
         pagination: {
           page,
           limit,
@@ -72,7 +99,7 @@ export async function GET(request: NextRequest) {
       },
     });
   } catch (error: any) {
-    console.error('Get users error:', error);
+    console.error('Get customers error:', error);
     return NextResponse.json(
       { success: false, message: 'Internal server error' },
       { status: 500 }
@@ -91,7 +118,7 @@ export async function POST(request: NextRequest) {
     }
 
     const userPermissions = token.permissions as string[] || [];
-    if (!hasPermission(userPermissions, PERMISSIONS.USER_CREATE)) {
+    if (!hasPermission(userPermissions, PERMISSIONS.CUSTOMER_CREATE)) {
       return NextResponse.json(
         { success: false, message: 'Insufficient permissions' },
         { status: 403 }
@@ -99,41 +126,36 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const validatedData = createUserSchema.parse(body);
+    const validatedData = createCustomerSchema.parse(body);
 
     await connectToDatabase();
 
-    // Check if user already exists
-    const existingUser = await User.findOne({ email: validatedData.email });
-    if (existingUser) {
-      return NextResponse.json(
-        { success: false, message: 'User with this email already exists' },
-        { status: 400 }
-      );
-    }
-
-    // Hash password
-    const bcrypt = require('bcryptjs');
-    const hashedPassword = await bcrypt.hash(validatedData.password, 12);
-
-    // Create user
-    const user = new User({
+    const customer = new Customer({
       ...validatedData,
-      password: hashedPassword,
+      restaurantId: token.restaurantId,
+      orderHistory: [],
+      preferences: {
+        favoriteItems: [],
+        dietaryRestrictions: validatedData.preferences?.dietaryRestrictions || [],
+        spiceLevel: validatedData.preferences?.spiceLevel || 5,
+        notes: validatedData.preferences?.notes || '',
+      },
+      loyaltyPoints: 0,
+      totalSpent: 0,
+      visitFrequency: 0,
+      marketingOptIn: validatedData.marketingOptIn || false,
+      isActive: true,
     });
 
-    await user.save();
-
-    // Remove password from response
-    const { password, ...userWithoutPassword } = user.toObject();
+    await customer.save();
 
     return NextResponse.json({
       success: true,
-      message: 'User created successfully',
-      data: userWithoutPassword,
+      message: 'Customer created successfully',
+      data: customer,
     });
   } catch (error: any) {
-    console.error('Create user error:', error);
+    console.error('Create customer error:', error);
 
     if (error.name === 'ZodError') {
       return NextResponse.json(
@@ -164,7 +186,7 @@ export async function PATCH(request: NextRequest) {
     }
 
     const userPermissions = token.permissions as string[] || [];
-    if (!hasPermission(userPermissions, PERMISSIONS.USER_UPDATE)) {
+    if (!hasPermission(userPermissions, PERMISSIONS.CUSTOMER_UPDATE)) {
       return NextResponse.json(
         { success: false, message: 'Insufficient permissions' },
         { status: 403 }
@@ -176,43 +198,43 @@ export async function PATCH(request: NextRequest) {
 
     if (!_id) {
       return NextResponse.json(
-        { success: false, message: 'User ID is required' },
+        { success: false, message: 'Customer ID is required' },
         { status: 400 }
       );
     }
 
     await connectToDatabase();
 
-    // Check if user exists
-    const user = await User.findById(_id);
-    if (!user) {
+    // Check if customer exists and belongs to the user's restaurant
+    const customer = await Customer.findById(_id);
+    if (!customer) {
       return NextResponse.json(
-        { success: false, message: 'User not found' },
+        { success: false, message: 'Customer not found' },
         { status: 404 }
       );
     }
 
-    // Prevent modification of super_admin by non-super_admin users
-    if (user.role === 'super_admin' && !hasPermission(userPermissions, PERMISSIONS.SYSTEM_ADMIN)) {
+    // Check restaurant association
+    if (token.restaurantId && customer.restaurantId.toString() !== token.restaurantId) {
       return NextResponse.json(
-        { success: false, message: 'Cannot modify super admin users' },
+        { success: false, message: 'Not authorized to update this customer' },
         { status: 403 }
       );
     }
 
-    const updatedUser = await User.findByIdAndUpdate(
+    const updatedCustomer = await Customer.findByIdAndUpdate(
       _id,
       { $set: updateData },
       { new: true, runValidators: true }
-    ).select('-password').populate('restaurantId', 'name');
+    ).populate('orderHistory', 'total createdAt');
 
     return NextResponse.json({
       success: true,
-      message: 'User updated successfully',
-      data: updatedUser,
+      message: 'Customer updated successfully',
+      data: updatedCustomer,
     });
   } catch (error: any) {
-    console.error('Update user error:', error);
+    console.error('Update customer error:', error);
     return NextResponse.json(
       { success: false, message: 'Internal server error' },
       { status: 500 }
@@ -231,7 +253,7 @@ export async function DELETE(request: NextRequest) {
     }
 
     const userPermissions = token.permissions as string[] || [];
-    if (!hasPermission(userPermissions, PERMISSIONS.USER_DELETE)) {
+    if (!hasPermission(userPermissions, PERMISSIONS.CUSTOMER_DELETE)) {
       return NextResponse.json(
         { success: false, message: 'Insufficient permissions' },
         { status: 403 }
@@ -243,47 +265,39 @@ export async function DELETE(request: NextRequest) {
 
     if (!_id) {
       return NextResponse.json(
-        { success: false, message: 'User ID is required' },
+        { success: false, message: 'Customer ID is required' },
         { status: 400 }
       );
     }
 
     await connectToDatabase();
 
-    // Check if user exists
-    const user = await User.findById(_id);
-    if (!user) {
+    // Check if customer exists and belongs to the user's restaurant
+    const customer = await Customer.findById(_id);
+    if (!customer) {
       return NextResponse.json(
-        { success: false, message: 'User not found' },
+        { success: false, message: 'Customer not found' },
         { status: 404 }
       );
     }
 
-    // Prevent deletion of super_admin users
-    if (user.role === 'super_admin') {
+    // Check restaurant association
+    if (token.restaurantId && customer.restaurantId.toString() !== token.restaurantId) {
       return NextResponse.json(
-        { success: false, message: 'Cannot delete super admin users' },
-        { status: 400 }
-      );
-    }
-
-    // Prevent users from deleting themselves
-    if (_id === token.sub) {
-      return NextResponse.json(
-        { success: false, message: 'Cannot delete your own account' },
-        { status: 400 }
+        { success: false, message: 'Not authorized to delete this customer' },
+        { status: 403 }
       );
     }
 
     // Soft delete by setting isActive to false
-    await User.findByIdAndUpdate(_id, { isActive: false });
+    await Customer.findByIdAndUpdate(_id, { isActive: false });
 
     return NextResponse.json({
       success: true,
-      message: 'User deleted successfully',
+      message: 'Customer deleted successfully',
     });
   } catch (error: any) {
-    console.error('Delete user error:', error);
+    console.error('Delete customer error:', error);
     return NextResponse.json(
       { success: false, message: 'Internal server error' },
       { status: 500 }
