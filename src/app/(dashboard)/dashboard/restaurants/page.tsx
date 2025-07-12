@@ -53,12 +53,17 @@ import {
   Settings,
   Eye,
 } from "lucide-react";
-import { useRestaurants, useRestaurantOperations, Restaurant } from "@/hooks/useRestaurants";
+import {
+  useRestaurants,
+  useRestaurantOperations,
+  Restaurant,
+} from "@/hooks/useRestaurants";
 
 export default function RestaurantsPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
-  const [selectedRestaurant, setSelectedRestaurant] = useState<Restaurant | null>(null);
+  const [selectedRestaurant, setSelectedRestaurant] =
+    useState<Restaurant | null>(null);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
@@ -71,15 +76,12 @@ export default function RestaurantsPage() {
     refetch: refetchRestaurants,
   } = useRestaurants({
     search: searchTerm,
-    status: filterStatus as 'all' | 'active' | 'inactive',
+    status: filterStatus as "all" | "active" | "inactive",
   });
 
   // Restaurant operations
-  const {
-    createRestaurant,
-    updateRestaurant,
-    deleteRestaurant,
-  } = useRestaurantOperations();
+  const { createRestaurant, updateRestaurant, deleteRestaurant } =
+    useRestaurantOperations();
 
   // Restaurants are already filtered by the hook
   const filteredRestaurants = restaurants;
@@ -87,27 +89,34 @@ export default function RestaurantsPage() {
   const handleCreateRestaurant = async (formData: FormData) => {
     try {
       const restaurantData = {
-        name: formData.get('name') as string,
-        description: formData.get('description') as string,
-        capacity: parseInt(formData.get('capacity') as string),
-        priceRange: formData.get('priceRange') as 'budget' | 'mid' | 'upscale' | 'fine_dining',
-        cuisine: (formData.get('cuisine') as string).split(',').map(c => c.trim()),
+        name: formData.get("name") as string,
+        description: formData.get("description") as string,
+        capacity: parseInt(formData.get("capacity") as string),
+        priceRange: formData.get("priceRange") as
+          | "budget"
+          | "mid"
+          | "upscale"
+          | "fine_dining",
+        cuisine: (formData.get("cuisine") as string)
+          .split(",")
+          .map((c) => c.trim()),
         address: {
-          street: formData.get('street') as string,
-          city: formData.get('city') as string,
-          state: formData.get('state') as string,
-          zipCode: formData.get('zipCode') as string,
-          country: formData.get('country') as string,
+          street: formData.get("street") as string,
+          city: formData.get("city") as string,
+          state: formData.get("state") as string,
+          zipCode: formData.get("zipCode") as string,
+          country: formData.get("country") as string,
         },
         contactInfo: {
-          phone: formData.get('phone') as string,
-          email: formData.get('email') as string,
-          website: formData.get('website') as string,
+          phone: formData.get("phone") as string,
+          email: formData.get("email") as string,
+          website: formData.get("website") as string,
         },
-        taxRate: parseFloat(formData.get('taxRate') as string) || 0,
-        serviceChargeRate: parseFloat(formData.get('serviceChargeRate') as string) || 0,
-        currency: formData.get('currency') as string || 'USD',
-        timezone: formData.get('timezone') as string,
+        taxRate: parseFloat(formData.get("taxRate") as string) || 0,
+        serviceChargeRate:
+          parseFloat(formData.get("serviceChargeRate") as string) || 0,
+        currency: (formData.get("currency") as string) || "USD",
+        timezone: formData.get("timezone") as string,
       };
       await createRestaurant(restaurantData);
       setIsCreateDialogOpen(false);
@@ -121,27 +130,34 @@ export default function RestaurantsPage() {
     if (!selectedRestaurant) return;
     try {
       const restaurantData = {
-        name: formData.get('name') as string,
-        description: formData.get('description') as string,
-        capacity: parseInt(formData.get('capacity') as string),
-        priceRange: formData.get('priceRange') as 'budget' | 'mid' | 'upscale' | 'fine_dining',
-        cuisine: (formData.get('cuisine') as string).split(',').map(c => c.trim()),
+        name: formData.get("name") as string,
+        description: formData.get("description") as string,
+        capacity: parseInt(formData.get("capacity") as string),
+        priceRange: formData.get("priceRange") as
+          | "budget"
+          | "mid"
+          | "upscale"
+          | "fine_dining",
+        cuisine: (formData.get("cuisine") as string)
+          .split(",")
+          .map((c) => c.trim()),
         address: {
-          street: formData.get('street') as string,
-          city: formData.get('city') as string,
-          state: formData.get('state') as string,
-          zipCode: formData.get('zipCode') as string,
-          country: formData.get('country') as string,
+          street: formData.get("street") as string,
+          city: formData.get("city") as string,
+          state: formData.get("state") as string,
+          zipCode: formData.get("zipCode") as string,
+          country: formData.get("country") as string,
         },
         contactInfo: {
-          phone: formData.get('phone') as string,
-          email: formData.get('email') as string,
-          website: formData.get('website') as string,
+          phone: formData.get("phone") as string,
+          email: formData.get("email") as string,
+          website: formData.get("website") as string,
         },
-        taxRate: parseFloat(formData.get('taxRate') as string) || 0,
-        serviceChargeRate: parseFloat(formData.get('serviceChargeRate') as string) || 0,
-        currency: formData.get('currency') as string || 'USD',
-        timezone: formData.get('timezone') as string,
+        taxRate: parseFloat(formData.get("taxRate") as string) || 0,
+        serviceChargeRate:
+          parseFloat(formData.get("serviceChargeRate") as string) || 0,
+        currency: (formData.get("currency") as string) || "USD",
+        timezone: formData.get("timezone") as string,
       };
       await updateRestaurant(selectedRestaurant._id, restaurantData);
       setIsEditDialogOpen(false);
@@ -165,7 +181,7 @@ export default function RestaurantsPage() {
       budget: "Budget ($)",
       mid: "Mid-range ($$)",
       upscale: "Upscale ($$$)",
-      fine_dining: "Fine Dining ($$$$)"
+      fine_dining: "Fine Dining ($$$$)",
     };
     return labels[priceRange as keyof typeof labels] || priceRange;
   };
@@ -217,7 +233,9 @@ export default function RestaurantsPage() {
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Restaurants</CardTitle>
+            <CardTitle className="text-sm font-medium">
+              Total Restaurants
+            </CardTitle>
             <Building className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -230,31 +248,31 @@ export default function RestaurantsPage() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Active Locations</CardTitle>
+            <CardTitle className="text-sm font-medium">
+              Active Locations
+            </CardTitle>
             <Star className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {restaurants.filter(r => r.isActive).length}
+              {restaurants.filter((r) => r.isActive).length}
             </div>
-            <p className="text-xs text-muted-foreground">
-              Currently operating
-            </p>
+            <p className="text-xs text-muted-foreground">Currently operating</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Capacity</CardTitle>
+            <CardTitle className="text-sm font-medium">
+              Total Capacity
+            </CardTitle>
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
               {restaurants.reduce((sum, r) => sum + r.capacity, 0)}
             </div>
-            <p className="text-xs text-muted-foreground">
-              Combined seating
-            </p>
+            <p className="text-xs text-muted-foreground">Combined seating</p>
           </CardContent>
         </Card>
 
@@ -265,7 +283,10 @@ export default function RestaurantsPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {(restaurants.reduce((sum, r) => sum + r.averageRating, 0) / restaurants.length || 0).toFixed(1)}
+              {(
+                restaurants.reduce((sum, r) => sum + r.averageRating, 0) /
+                  restaurants.length || 0
+              ).toFixed(1)}
             </div>
             <p className="text-xs text-muted-foreground">
               Across all locations
@@ -325,7 +346,8 @@ export default function RestaurantsPage() {
                       <div>
                         <div className="font-medium">{restaurant.name}</div>
                         <div className="text-sm text-muted-foreground">
-                          {restaurant.cuisine.join(", ")} • {getPriceRangeLabel(restaurant.priceRange)}
+                          {restaurant.cuisine?.join(", ") || "N/A"} •{" "}
+                          {getPriceRangeLabel(restaurant.priceRange)}
                         </div>
                       </div>
                     </TableCell>
@@ -333,10 +355,11 @@ export default function RestaurantsPage() {
                       <div className="space-y-1">
                         <div className="flex items-center text-sm">
                           <MapPin className="mr-1 h-3 w-3" />
-                          {restaurant.address.city}, {restaurant.address.state}
+                          {restaurant.address?.city || "N/A"},{" "}
+                          {restaurant.address?.state || "N/A"}
                         </div>
                         <div className="text-xs text-muted-foreground">
-                          {restaurant.address.street}
+                          {restaurant.address?.street || "N/A"}
                         </div>
                       </div>
                     </TableCell>
@@ -344,24 +367,25 @@ export default function RestaurantsPage() {
                       <div className="space-y-1">
                         <div className="flex items-center text-sm">
                           <Phone className="mr-1 h-3 w-3" />
-                          {restaurant.contactInfo.phone}
+                          {restaurant.contactInfo?.phone || "N/A"}
                         </div>
                         <div className="flex items-center text-sm">
                           <Mail className="mr-1 h-3 w-3" />
-                          {restaurant.contactInfo.email}
+                          {restaurant.contactInfo?.email || "N/A"}
                         </div>
                       </div>
                     </TableCell>
                     <TableCell>
                       <div className="text-sm">
-                        {restaurant.capacity} seats
+                        {restaurant.capacity || 0} seats
                       </div>
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center">
                         <Star className="mr-1 h-3 w-3 fill-current text-yellow-400" />
                         <span className="text-sm">
-                          {restaurant.averageRating.toFixed(1)} ({restaurant.totalReviews})
+                          {restaurant.averageRating?.toFixed(1) || "0.0"} (
+                          {restaurant.totalReviews || 0})
                         </span>
                       </div>
                     </TableCell>
@@ -514,7 +538,9 @@ function RestaurantForm({
                   <SelectItem value="budget">Budget ($)</SelectItem>
                   <SelectItem value="mid">Mid-range ($$)</SelectItem>
                   <SelectItem value="upscale">Upscale ($$$)</SelectItem>
-                  <SelectItem value="fine_dining">Fine Dining ($$$$)</SelectItem>
+                  <SelectItem value="fine_dining">
+                    Fine Dining ($$$$)
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -524,7 +550,7 @@ function RestaurantForm({
                 id="cuisine"
                 name="cuisine"
                 placeholder="Italian, Mediterranean, etc."
-                defaultValue={restaurant?.cuisine.join(", ")}
+                defaultValue={restaurant?.cuisine?.join(", ") || ""}
               />
             </div>
           </div>
@@ -536,7 +562,7 @@ function RestaurantForm({
             <Input
               id="street"
               name="street"
-              defaultValue={restaurant?.address.street}
+              defaultValue={restaurant?.address?.street || ""}
               required
             />
           </div>
@@ -547,7 +573,7 @@ function RestaurantForm({
               <Input
                 id="city"
                 name="city"
-                defaultValue={restaurant?.address.city}
+                defaultValue={restaurant?.address?.city || ""}
                 required
               />
             </div>
@@ -556,7 +582,7 @@ function RestaurantForm({
               <Input
                 id="state"
                 name="state"
-                defaultValue={restaurant?.address.state}
+                defaultValue={restaurant?.address?.state || ""}
                 required
               />
             </div>
@@ -568,7 +594,7 @@ function RestaurantForm({
               <Input
                 id="zipCode"
                 name="zipCode"
-                defaultValue={restaurant?.address.zipCode}
+                defaultValue={restaurant?.address?.zipCode || ""}
                 required
               />
             </div>
@@ -577,7 +603,7 @@ function RestaurantForm({
               <Input
                 id="country"
                 name="country"
-                defaultValue={restaurant?.address.country}
+                defaultValue={restaurant?.address?.country || ""}
                 required
               />
             </div>
@@ -589,7 +615,7 @@ function RestaurantForm({
               <Input
                 id="phone"
                 name="phone"
-                defaultValue={restaurant?.contactInfo.phone}
+                defaultValue={restaurant?.contactInfo?.phone || ""}
                 required
               />
             </div>
@@ -599,7 +625,7 @@ function RestaurantForm({
                 id="email"
                 name="email"
                 type="email"
-                defaultValue={restaurant?.contactInfo.email}
+                defaultValue={restaurant?.contactInfo?.email || ""}
                 required
               />
             </div>
@@ -610,7 +636,7 @@ function RestaurantForm({
             <Input
               id="website"
               name="website"
-              defaultValue={restaurant?.contactInfo.website}
+              defaultValue={restaurant?.contactInfo?.website || ""}
             />
           </div>
         </TabsContent>
@@ -619,28 +645,48 @@ function RestaurantForm({
           <div className="text-sm text-muted-foreground mb-4">
             Set operating hours for each day of the week
           </div>
-          {['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'].map((day) => (
+          {[
+            "monday",
+            "tuesday",
+            "wednesday",
+            "thursday",
+            "friday",
+            "saturday",
+            "sunday",
+          ].map((day) => (
             <div key={day} className="flex items-center space-x-4">
               <div className="w-24 font-medium capitalize">{day}</div>
               <div className="flex items-center space-x-2">
                 <Input
                   type="time"
                   name={`${day}_open`}
-                  defaultValue={restaurant?.businessHours[day as keyof typeof restaurant.businessHours]?.open}
+                  defaultValue={
+                    restaurant?.businessHours?.[
+                      day as keyof typeof restaurant.businessHours
+                    ]?.open || ""
+                  }
                   className="w-32"
                 />
                 <span>to</span>
                 <Input
                   type="time"
                   name={`${day}_close`}
-                  defaultValue={restaurant?.businessHours[day as keyof typeof restaurant.businessHours]?.close}
+                  defaultValue={
+                    restaurant?.businessHours?.[
+                      day as keyof typeof restaurant.businessHours
+                    ]?.close || ""
+                  }
                   className="w-32"
                 />
                 <label className="flex items-center space-x-2">
                   <input
                     type="checkbox"
                     name={`${day}_closed`}
-                    defaultChecked={restaurant?.businessHours[day as keyof typeof restaurant.businessHours]?.isClosed}
+                    defaultChecked={
+                      restaurant?.businessHours[
+                        day as keyof typeof restaurant.businessHours
+                      ]?.isClosed
+                    }
                   />
                   <span className="text-sm">Closed</span>
                 </label>
@@ -676,7 +722,10 @@ function RestaurantForm({
           <div className="grid grid-cols-2 gap-4">
             <div>
               <Label htmlFor="currency">Currency</Label>
-              <Select name="currency" defaultValue={restaurant?.currency || "USD"}>
+              <Select
+                name="currency"
+                defaultValue={restaurant?.currency || "USD"}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Select currency" />
                 </SelectTrigger>
@@ -698,7 +747,9 @@ function RestaurantForm({
                   <SelectItem value="America/New_York">Eastern Time</SelectItem>
                   <SelectItem value="America/Chicago">Central Time</SelectItem>
                   <SelectItem value="America/Denver">Mountain Time</SelectItem>
-                  <SelectItem value="America/Los_Angeles">Pacific Time</SelectItem>
+                  <SelectItem value="America/Los_Angeles">
+                    Pacific Time
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -735,7 +786,8 @@ function RestaurantDetails({ restaurant }: { restaurant: Restaurant }) {
                 {restaurant.address.street}
               </div>
               <div className="ml-6">
-                {restaurant.address.city}, {restaurant.address.state} {restaurant.address.zipCode}
+                {restaurant.address.city}, {restaurant.address.state}{" "}
+                {restaurant.address.zipCode}
               </div>
               <div className="ml-6">{restaurant.address.country}</div>
             </div>
@@ -794,7 +846,9 @@ function RestaurantDetails({ restaurant }: { restaurant: Restaurant }) {
               {hours.isClosed ? (
                 <span className="text-red-500">Closed</span>
               ) : (
-                <span>{hours.open} - {hours.close}</span>
+                <span>
+                  {hours.open} - {hours.close}
+                </span>
               )}
             </div>
           ))}

@@ -104,8 +104,18 @@ export function useRealTimeNotifications() {
 
   // Initialize connection when session is available
   useEffect(() => {
+    console.log('🔍 Session check:', { 
+      hasSession: !!session, 
+      restaurantId: session?.user?.restaurantId,
+      userId: session?.user?.id,
+      initialized: initializationRef.current 
+    });
+    
     if (session?.user?.restaurantId && !initializationRef.current) {
+      console.log('✅ Session valid, initializing connection...');
       initializeConnection();
+    } else if (session && !session?.user?.restaurantId) {
+      console.warn('⚠️ Session exists but no restaurantId found');
     }
 
     return () => {

@@ -81,9 +81,20 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  console.log('🍽️ [MENU API] POST request started');
+  
   try {
     const token = await getToken({ req: request });
+    console.log('🍽️ [MENU API] Token retrieved:', {
+      hasToken: !!token,
+      userId: token?.sub,
+      role: token?.role,
+      restaurantId: token?.restaurantId,
+      permissionsLength: Array.isArray(token?.permissions) ? token.permissions.length : 0
+    });
+    
     if (!token) {
+      console.log('🍽️ [MENU API] ❌ No token found');
       return NextResponse.json(
         { success: false, message: "Authentication required" },
         { status: 401 }
@@ -91,45 +102,68 @@ export async function POST(request: NextRequest) {
     }
 
     const userPermissions = (token.permissions as string[]) || [];
-    if (!hasPermission(userPermissions, PERMISSIONS.MENU_CREATE)) {
+    console.log('🍽️ [MENU API] User permissions:', userPermissions);
+    console.log('🍽️ [MENU API] Required permission:', PERMISSIONS.MENU_CREATE);
+    
+    const hasCreatePermission = hasPermission(userPermissions, PERMISSIONS.MENU_CREATE);
+    console.log('🍽️ [MENU API] Has create permission:', hasCreatePermission);
+    
+    if (!hasCreatePermission) {
+      console.log('🍽️ [MENU API] ❌ Insufficient permissions');
       return NextResponse.json(
-        { success: false, message: "Insufficient permissions" },
+        { success: false, message: "Insufficient permissions", debug: { userPermissions, required: PERMISSIONS.MENU_CREATE } },
         { status: 403 }
       );
     }
 
     const body = await request.json();
+    console.log('🍽️ [MENU API] Request body:', JSON.stringify(body, null, 2));
     
     // Ensure restaurantId is provided
+    console.log('🍽️ [MENU API] Checking restaurant ID:', { tokenRestaurantId: token.restaurantId, bodyRestaurantId: body.restaurantId });
+    
     if (!token.restaurantId && !body.restaurantId) {
+      console.log('🍽️ [MENU API] ❌ No restaurant ID found');
       return NextResponse.json(
         { success: false, message: "Restaurant ID is required" },
         { status: 400 }
       );
     }
     
-    const validatedData = createMenuItemSchema.parse({
+    const dataToValidate = {
       ...body,
       restaurantId: token.restaurantId || body.restaurantId,
-    });
+    };
+    console.log('🍽️ [MENU API] Data to validate:', JSON.stringify(dataToValidate, null, 2));
+    
+    const validatedData = createMenuItemSchema.parse(dataToValidate);
+    console.log('🍽️ [MENU API] ✅ Data validation passed');
 
+    console.log('🍽️ [MENU API] Connecting to database...');
     await connectToDatabase();
+    console.log('🍽️ [MENU API] ✅ Database connected');
 
+    console.log('🍽️ [MENU API] Creating menu item...');
     const menuItem = new MenuItem(validatedData);
     await menuItem.save();
+    console.log('🍽️ [MENU API] ✅ Menu item saved:', menuItem._id);
 
+    console.log('🍽️ [MENU API] Populating menu item...');
     const populatedItem = await MenuItem.findById(menuItem._id).populate(
       "ingredients.ingredientId",
       "itemName unit"
     );
+    console.log('🍽️ [MENU API] ✅ Menu item populated');
 
+    console.log('🍽️ [MENU API] ✅ SUCCESS - Menu item created successfully');
     return NextResponse.json({
       success: true,
       message: "Menu item created successfully",
       data: populatedItem,
     });
   } catch (error: any) {
-    console.error("Create menu item error:", error);
+    console.error("🍽️ [MENU API] ❌ ERROR:", error);
+    console.error("🍽️ [MENU API] Error stack:", error.stack);
 
     if (error.name === "ZodError") {
       return NextResponse.json(

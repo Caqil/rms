@@ -60,7 +60,7 @@ class SocketManager {
 
   // Initialize WebSocket connection
   async connect(restaurantId: string, authToken: string): Promise<SocketManager> {
-    console.log('🔌 Starting connection process...', { restaurantId, authToken });
+    console.log('🔌 Starting connection process...', { restaurantId, authToken: authToken ? 'present' : 'missing' });
     
     // Cleanup any existing connection
     if (this.socket) {

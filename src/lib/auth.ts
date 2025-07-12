@@ -6,6 +6,7 @@ import { MongoClient } from 'mongodb';
 import bcrypt from 'bcryptjs';
 import { connectToDatabase } from './db';
 import User from '../models/User';
+import { ROLE_PERMISSIONS } from './permissions';
 
 // Create separate MongoDB client for NextAuth adapter
 const client = new MongoClient(process.env.MONGODB_URI!);
@@ -41,12 +42,17 @@ export const authOptions: NextAuthOptions = {
           throw new Error('Invalid password');
         }
 
+        // Assign permissions based on role if user permissions are empty
+        const userPermissions = user.permissions && user.permissions.length > 0 
+          ? user.permissions 
+          : ROLE_PERMISSIONS[user.role as keyof typeof ROLE_PERMISSIONS] || [];
+
         return {
           id: user._id.toString(),
           email: user.email,
           name: user.name,
           role: user.role,
-          permissions: user.permissions || [],
+          permissions: userPermissions,
           restaurantId: user.restaurantId?._id?.toString(),
           restaurantName: user.restaurantId?.name,
         };
@@ -134,12 +140,17 @@ export const authOptionsSimple: NextAuthOptions = {
           throw new Error('Invalid password');
         }
 
+        // Assign permissions based on role if user permissions are empty
+        const userPermissions = user.permissions && user.permissions.length > 0 
+          ? user.permissions 
+          : ROLE_PERMISSIONS[user.role as keyof typeof ROLE_PERMISSIONS] || [];
+
         return {
           id: user._id.toString(),
           email: user.email,
           name: user.name,
           role: user.role,
-          permissions: user.permissions || [],
+          permissions: userPermissions,
           restaurantId: user.restaurantId?._id?.toString(),
           restaurantName: user.restaurantId?.name,
         };

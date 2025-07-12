@@ -46,9 +46,20 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  console.log('📦 [INVENTORY API] POST request started');
+  
   try {
     const token = await getToken({ req: request });
+    console.log('📦 [INVENTORY API] Token retrieved:', {
+      hasToken: !!token,
+      userId: token?.sub,
+      role: token?.role,
+      restaurantId: token?.restaurantId,
+      permissionsLength: Array.isArray(token?.permissions) ? token.permissions.length : 0
+    });
+    
     if (!token) {
+      console.log('📦 [INVENTORY API] ❌ No token found');
       return NextResponse.json(
         { success: false, message: 'Authentication required' },
         { status: 401 }
@@ -56,31 +67,60 @@ export async function POST(request: NextRequest) {
     }
 
     const userPermissions = token.permissions as string[] || [];
-    if (!hasPermission(userPermissions, PERMISSIONS.INVENTORY_CREATE)) {
+    console.log('📦 [INVENTORY API] User permissions:', userPermissions);
+    console.log('📦 [INVENTORY API] Required permission:', PERMISSIONS.INVENTORY_CREATE);
+    
+    const hasCreatePermission = hasPermission(userPermissions, PERMISSIONS.INVENTORY_CREATE);
+    console.log('📦 [INVENTORY API] Has create permission:', hasCreatePermission);
+    
+    if (!hasCreatePermission) {
+      console.log('📦 [INVENTORY API] ❌ Insufficient permissions');
       return NextResponse.json(
-        { success: false, message: 'Insufficient permissions' },
+        { success: false, message: 'Insufficient permissions', debug: { userPermissions, required: PERMISSIONS.INVENTORY_CREATE } },
         { status: 403 }
       );
     }
 
     const body = await request.json();
-    const validatedData = createInventorySchema.parse({
+    console.log('📦 [INVENTORY API] Request body:', JSON.stringify(body, null, 2));
+    
+    console.log('📦 [INVENTORY API] Checking restaurant ID:', { tokenRestaurantId: token.restaurantId });
+    
+    if (!token.restaurantId) {
+      console.log('📦 [INVENTORY API] ❌ No restaurant ID found');
+      return NextResponse.json(
+        { success: false, message: 'Restaurant ID is required' },
+        { status: 400 }
+      );
+    }
+    
+    const dataToValidate = {
       ...body,
       restaurantId: token.restaurantId,
-    });
+    };
+    console.log('📦 [INVENTORY API] Data to validate:', JSON.stringify(dataToValidate, null, 2));
+    
+    const validatedData = createInventorySchema.parse(dataToValidate);
+    console.log('📦 [INVENTORY API] ✅ Data validation passed');
 
+    console.log('📦 [INVENTORY API] Connecting to database...');
     await connectToDatabase();
+    console.log('📦 [INVENTORY API] ✅ Database connected');
 
+    console.log('📦 [INVENTORY API] Creating inventory item...');
     const inventoryItem = new Inventory(validatedData);
     await inventoryItem.save();
+    console.log('📦 [INVENTORY API] ✅ Inventory item saved:', inventoryItem._id);
 
+    console.log('📦 [INVENTORY API] ✅ SUCCESS - Inventory item created successfully');
     return NextResponse.json({
       success: true,
       message: 'Inventory item created successfully',
       data: inventoryItem,
     });
   } catch (error: any) {
-    console.error('Create inventory item error:', error);
+    console.error('📦 [INVENTORY API] ❌ ERROR:', error);
+    console.error('📦 [INVENTORY API] Error stack:', error.stack);
 
     if (error.name === 'ZodError') {
       return NextResponse.json(
