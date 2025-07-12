@@ -1,15 +1,14 @@
 "use client";
 
+import { useState } from "react";
 import { useSession } from "next-auth/react";
 import { redirect } from "next/navigation";
-import { useState } from "react";
-import { Toaster } from "sonner";
-import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
-import { Skeleton } from "@/components/ui/skeleton";
+import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/layout/AppSidebar";
-import { Header } from "../../components/layout/Header";
-// ADDED: Import toast notifications
-import ToastNotifications from "@/components/notifications/ToastNotifications";
+import { Header } from "@/components/layout/Header";
+import { ConnectionStatus } from "@/components/notifications/ConnectionStatus";
+import { ToastNotificationContainer } from "@/components/notifications/ToastNotificationContainer";
+import { Toaster } from "sonner";
 
 export default function DashboardLayout({
   children,
@@ -17,40 +16,38 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const { data: session, status } = useSession();
-  const [sidebarOpen, setSidebarOpen] = useState(true);
 
   if (status === "loading") {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="space-y-4 w-full max-w-md">
-          <Skeleton className="h-8 w-3/4 mx-auto" />
-          <Skeleton className="h-4 w-1/2 mx-auto" />
-          <div className="flex justify-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-          </div>
-        </div>
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
       </div>
     );
   }
 
-  if (status === "unauthenticated") {
+  if (!session) {
     redirect("/auth/login");
   }
 
   return (
     <SidebarProvider>
-      <div className="min-h-screen flex w-full bg-background">
-        <AppSidebar userRole={session?.user?.role || ""} />
-        <SidebarInset className="flex flex-col">
-          <Header user={session?.user} />
-          <main className="flex-1 overflow-y-auto">
-            <div className="container mx-auto p-6 space-y-6">{children}</div>
-          </main>
-        </SidebarInset>
+      <div className="min-h-screen flex w-full">
+        {/* Sidebar */}
+        <AppSidebar userRole={session.user.role} />
+
+        {/* Main Content */}
+        <div className="flex-1 flex flex-col">
+          {/* Header */}
+          <Header />
+
+          {/* Page Content */}
+          <main className="flex-1 p-6 bg-background">{children}</main>
+        </div>
+
+        {/* Real-time Features */}
+        <ToastNotificationContainer />
+        <Toaster position="bottom-right" />
       </div>
-      <Toaster richColors />
-      {/* ADDED: Toast notifications component */}
-      <ToastNotifications />
     </SidebarProvider>
   );
 }

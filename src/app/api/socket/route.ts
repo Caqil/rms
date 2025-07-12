@@ -1,59 +1,29 @@
 
 import { NextRequest, NextResponse } from 'next/server';
-import { Server as ServerIO } from 'socket.io';
-import { Server as NetServer } from 'http';
+import { getToken } from 'next-auth/jwt';
 
-// Extend the global object to store the io instance
-declare global {
-  var io: ServerIO | undefined;
-}
-
-// This extends the NextResponse to include socket
-interface NextApiResponseWithSocket extends NextResponse {
-  socket?: {
-    server: NetServer & {
-      io?: ServerIO;
-    };
-  };
-}
+// In-memory store for demonstration (use Redis in production)
+const activeConnections = new Map();
+const notifications = new Map();
 
 export async function GET(request: NextRequest) {
-  // Check if Socket.IO server is already running
-  if (global.io) {
-    console.log('✅ Socket.IO server already running');
-    return NextResponse.json({ 
-      success: true, 
-      message: 'Socket.IO server already running',
-      status: 'active'
-    });
-  }
-
   try {
-    console.log('🚀 Initializing Socket.IO server...');
-
-    // For App Router, we need to handle this differently
-    // Since we can't access the underlying HTTP server directly,
-    // we'll create a simple polling system instead
-
-    console.log('✅ Socket.IO server initialized (polling mode)');
+    console.log('🔧 Socket status check requested');
     
-    // Set a flag to indicate server is "running" (in polling mode)
-    global.io = true as any;
-
-    return NextResponse.json({ 
-      success: true, 
-      message: 'Socket.IO server initialized in polling mode',
-      status: 'polling'
+    return NextResponse.json({
+      success: true,
+      message: 'Socket server status',
+      data: {
+        isRunning: true,
+        connectedClients: activeConnections.size,
+        serverTime: new Date().toISOString(),
+        status: 'operational'
+      }
     });
-
-  } catch (error: any) {
-    console.error('❌ Failed to initialize Socket.IO server:', error);
+  } catch (error) {
+    console.error('❌ Socket status error:', error);
     return NextResponse.json(
-      { 
-        success: false, 
-        message: 'Failed to initialize Socket.IO server',
-        error: error.message 
-      },
+      { success: false, message: 'Socket server error' },
       { status: 500 }
     );
   }
@@ -61,54 +31,123 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
-    const { type, data } = body;
-
-    console.log('📡 Received WebSocket event:', type, data);
-
-    // In polling mode, we just log the events
-    // Real WebSocket events would be handled here
-    
-    switch (type) {
-      case 'new_order':
-        console.log('🆕 New order event:', data);
-        break;
-      case 'order_status_update':
-        console.log('🔄 Order status update:', data);
-        break;
-      case 'order_priority_update':
-        console.log('⚡ Order priority update:', data);
-        break;
-      default:
-        console.log('📨 Unknown event type:', type);
+    const token = await getToken({ req: request });
+    if (!token) {
+      return NextResponse.json(
+        { success: false, message: 'Authentication required' },
+        { status: 401 }
+      );
     }
 
-    return NextResponse.json({ 
-      success: true, 
-      message: 'Event processed',
-      type,
-      timestamp: new Date().toISOString()
-    });
+    const body = await request.json();
+    const { action, data } = body;
+
+    console.log('📡 Socket API action:', action, data);
+
+    switch (action) {
+      case 'connect':
+        const { restaurantId, clientId } = data;
+        activeConnections.set(clientId, {
+          restaurantId,
+          connectedAt: new Date(),
+          lastSeen: new Date()
+        });
+        
+        console.log(`✅ Client ${clientId} connected to restaurant ${restaurantId}`);
+        
+        return NextResponse.json({
+          success: true,
+          message: 'Client connected',
+          data: { clientId, restaurantId, status: 'connected' }
+        });
+
+      case 'disconnect':
+        const { clientId: disconnectClientId } = data;
+        activeConnections.delete(disconnectClientId);
+        
+        console.log(`🔌 Client ${disconnectClientId} disconnected`);
+        
+        return NextResponse.json({
+          success: true,
+          message: 'Client disconnected'
+        });
+
+      case 'heartbeat':
+        const { clientId: heartbeatClientId } = data;
+        if (activeConnections.has(heartbeatClientId)) {
+          const connection = activeConnections.get(heartbeatClientId);
+          connection.lastSeen = new Date();
+          activeConnections.set(heartbeatClientId, connection);
+        }
+        
+        return NextResponse.json({
+          success: true,
+          message: 'Heartbeat received',
+          timestamp: new Date().toISOString()
+        });
+
+      case 'broadcast_notification':
+        const { restaurantId: notifyRestaurantId, notification } = data;
+        
+        // Store notification (in production, save to database)
+        const notificationId = `${notifyRestaurantId}-${Date.now()}`;
+        notifications.set(notificationId, {
+          ...notification,
+          restaurantId: notifyRestaurantId,
+          createdAt: new Date()
+        });
+        
+        console.log(`📨 Notification broadcast to restaurant ${notifyRestaurantId}:`, notification.title);
+        
+        return NextResponse.json({
+          success: true,
+          message: 'Notification broadcast',
+          notificationId
+        });
+
+      case 'get_status':
+        const { restaurantId: statusRestaurantId } = data;
+        const restaurantConnections = Array.from(activeConnections.entries())
+          .filter(([_, conn]) => conn.restaurantId === statusRestaurantId);
+        
+        return NextResponse.json({
+          success: true,
+          data: {
+            restaurantId: statusRestaurantId,
+            connectedClients: restaurantConnections.length,
+            connections: restaurantConnections.map(([clientId, conn]) => ({
+              clientId,
+              connectedAt: conn.connectedAt,
+              lastSeen: conn.lastSeen
+            }))
+          }
+        });
+
+      default:
+        return NextResponse.json(
+          { success: false, message: 'Unknown action' },
+          { status: 400 }
+        );
+    }
 
   } catch (error: any) {
-    console.error('❌ Error processing WebSocket event:', error);
+    console.error('❌ Socket API error:', error);
     return NextResponse.json(
-      { 
-        success: false, 
-        message: 'Error processing event',
-        error: error.message 
-      },
+      { success: false, message: 'Internal server error' },
       { status: 500 }
     );
   }
 }
 
-// Health check endpoint
-export async function HEAD(request: NextRequest) {
-  return new NextResponse(null, { 
-    status: 200,
-    headers: {
-      'Content-Type': 'application/json',
+// Cleanup old connections (called periodically)
+setInterval(() => {
+  const now = new Date();
+  const timeoutMs = 60000; // 1 minute timeout
+  
+  for (const [clientId, connection] of activeConnections.entries()) {
+    if (now.getTime() - connection.lastSeen.getTime() > timeoutMs) {
+      console.log(`🧹 Cleaning up stale connection: ${clientId}`);
+      activeConnections.delete(clientId);
     }
-  });
-}
+  }
+}, 30000); // Check every 30 seconds

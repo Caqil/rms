@@ -1,7 +1,7 @@
-// src/lib/socket.ts
-// Simplified version that works with App Router limitations
 
-interface OrderUpdate {
+import { io, Socket } from 'socket.io-client';
+
+export interface OrderUpdate {
   orderId: string;
   status: string;
   tableNumber?: string;
@@ -9,7 +9,7 @@ interface OrderUpdate {
   restaurantId: string;
 }
 
-interface NewOrderData {
+export interface NewOrderData {
   _id: string;
   orderNumber: string;
   tableNumber?: string;
@@ -20,249 +20,314 @@ interface NewOrderData {
   restaurantId: string;
 }
 
-interface NotificationData {
+export interface NotificationData {
   _id: string;
   type: 'order' | 'kitchen' | 'inventory' | 'system';
   title: string;
   message: string;
   priority: 'low' | 'medium' | 'high' | 'urgent';
   data?: any;
+  timestamp: Date;
+}
+
+export interface KitchenUpdate {
+  orderId: string;
+  status: 'preparing' | 'ready' | 'served';
+  estimatedTime?: number;
+  actualTime?: number;
 }
 
 class SocketManager {
-  private isInitialized = false;
+  private socket: Socket | null = null;
   private restaurantId: string | null = null;
-  private eventListeners = new Map();
-  private isPollingMode = true; // We're using polling instead of WebSocket
+  private authToken: string | null = null;
+  private isConnected = false;
+  private reconnectAttempts = 0;
+  private maxReconnectAttempts = 5;
+  private reconnectTimeout: NodeJS.Timeout | null = null;
+  private heartbeatInterval: NodeJS.Timeout | null = null;
 
-  async connect(restaurantId: string, authToken: string) {
+  // Initialize WebSocket connection
+  async connect(restaurantId: string, authToken: string): Promise<SocketManager> {
     this.restaurantId = restaurantId;
-    
-    console.log('🔌 Connecting to notification system...', { restaurantId });
-    
-    // Initialize the "server" (actually just polling)
-    await this.initializeServer();
-    
-    // Simulate connection success
-    setTimeout(() => {
-      console.log('✅ Connected to notification system (polling mode)');
-      this.triggerEvent('connect', { restaurantId });
-    }, 500);
-    
-    return this;
-  }
-
-  // Initialize the server
-  async initializeServer(): Promise<void> {
-    if (this.isInitialized) {
-      return Promise.resolve();
-    }
+    this.authToken = authToken;
 
     try {
-      console.log('🔧 Initializing notification system...');
-      
-      const response = await fetch('/api/socket', {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
+      console.log('🔌 Connecting to WebSocket server...', { restaurantId });
+
+      // Initialize Socket.IO client
+      this.socket = io(process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:3000', {
+        auth: {
+          token: authToken,
+          restaurantId: restaurantId,
         },
+        transports: ['websocket', 'polling'],
+        upgrade: true,
+        timeout: 10000,
+        forceNew: true,
       });
-      
-      const result = await response.json();
-      
-      if (response.ok) {
-        console.log('✅ Notification system initialized:', result.message);
-        this.isInitialized = true;
-      } else {
-        throw new Error(`Server responded with status: ${response.status}`);
-      }
+
+      // Setup event listeners
+      this.setupEventListeners();
+
+      // Join restaurant room
+      this.socket.emit('join-restaurant', { restaurantId, authToken });
+
+      return new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => {
+          reject(new Error('Connection timeout'));
+        }, 10000);
+
+        this.socket!.on('connect', () => {
+          clearTimeout(timeout);
+          this.isConnected = true;
+          this.reconnectAttempts = 0;
+          console.log('✅ WebSocket connected successfully');
+          this.startHeartbeat();
+          resolve(this);
+        });
+
+        this.socket!.on('connect_error', (error) => {
+          clearTimeout(timeout);
+          console.error('❌ WebSocket connection failed:', error);
+          this.handleReconnection();
+          reject(error);
+        });
+      });
+
     } catch (error) {
-      console.error('❌ Failed to initialize notification system:', error);
-      this.isInitialized = false;
+      console.error('❌ Failed to initialize WebSocket:', error);
       throw error;
     }
   }
 
-  // Event listener management
-  private triggerEvent(eventName: string, data: any) {
-    const listeners = this.eventListeners.get(eventName) || [];
-    listeners.forEach((callback: Function) => {
-      try {
-        callback(data);
-      } catch (error) {
-        console.error('Error in event listener:', error);
+  // Setup all event listeners
+  private setupEventListeners(): void {
+    if (!this.socket) return;
+
+    // Connection events
+    this.socket.on('connect', () => {
+      console.log('🔗 WebSocket connected');
+      this.isConnected = true;
+      this.reconnectAttempts = 0;
+      this.startHeartbeat();
+    });
+
+    this.socket.on('disconnect', (reason) => {
+      console.log('🔌 WebSocket disconnected:', reason);
+      this.isConnected = false;
+      this.stopHeartbeat();
+      
+      if (reason === 'io server disconnect') {
+        // Server disconnected, try to reconnect
+        this.handleReconnection();
       }
+    });
+
+    this.socket.on('connect_error', (error) => {
+      console.error('❌ WebSocket connection error:', error);
+      this.isConnected = false;
+      this.handleReconnection();
+    });
+
+    // Server events
+    this.socket.on('restaurant-joined', (data) => {
+      console.log('🏢 Joined restaurant room:', data);
+    });
+
+    this.socket.on('error', (error) => {
+      console.error('🚨 WebSocket error:', error);
+    });
+
+    // Keep-alive response
+    this.socket.on('pong', () => {
+      console.log('🏓 Heartbeat response received');
     });
   }
 
-  private addEventListener(eventName: string, callback: Function) {
-    if (!this.eventListeners.has(eventName)) {
-      this.eventListeners.set(eventName, []);
+  // Handle reconnection logic
+  private handleReconnection(): void {
+    if (this.reconnectAttempts >= this.maxReconnectAttempts) {
+      console.error('❌ Max reconnection attempts reached');
+      return;
     }
-    this.eventListeners.get(eventName).push(callback);
+
+    if (this.reconnectTimeout) {
+      clearTimeout(this.reconnectTimeout);
+    }
+
+    const delay = Math.pow(2, this.reconnectAttempts) * 1000; // Exponential backoff
+    this.reconnectAttempts++;
+
+    console.log(`🔄 Attempting reconnection ${this.reconnectAttempts}/${this.maxReconnectAttempts} in ${delay}ms`);
+
+    this.reconnectTimeout = setTimeout(() => {
+      if (this.restaurantId && this.authToken) {
+        this.connect(this.restaurantId, this.authToken).catch(console.error);
+      }
+    }, delay);
+  }
+
+  // Start heartbeat to keep connection alive
+  private startHeartbeat(): void {
+    this.stopHeartbeat();
     
-    return () => {
-      const listeners = this.eventListeners.get(eventName) || [];
-      const index = listeners.indexOf(callback);
-      if (index > -1) {
-        listeners.splice(index, 1);
+    this.heartbeatInterval = setInterval(() => {
+      if (this.socket && this.isConnected) {
+        console.log('🏓 Sending heartbeat');
+        this.socket.emit('ping');
       }
-    };
+    }, 30000); // Send heartbeat every 30 seconds
   }
 
-  // Event handlers (simulate WebSocket events)
-  onNewOrder(callback: (order: NewOrderData) => void) {
-    return this.addEventListener('new_order', callback);
-  }
-
-  onOrderStatusUpdate(callback: (update: OrderUpdate) => void) {
-    return this.addEventListener('order_status_update', callback);
-  }
-
-  onOrderPriorityUpdate(callback: (update: { orderId: string; priority: string }) => void) {
-    return this.addEventListener('order_priority_update', callback);
-  }
-
-  onNewNotification(callback: (notification: NotificationData) => void) {
-    return this.addEventListener('new_notification', callback);
-  }
-
-  // Emit events (send to server via HTTP)
-  async emitOrderStatusUpdate(orderId: string, status: string, notes?: string) {
-    try {
-      const response = await fetch('/api/socket', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          type: 'order_status_update',
-          data: {
-            orderId,
-            status,
-            notes,
-            restaurantId: this.restaurantId
-          }
-        })
-      });
-
-      if (response.ok) {
-        console.log('📤 Order status update sent:', { orderId, status });
-        
-        // Trigger local event for immediate feedback
-        this.triggerEvent('order_status_update', {
-          orderId,
-          status,
-          restaurantId: this.restaurantId
-        });
-      }
-    } catch (error) {
-      console.error('Error sending order status update:', error);
+  // Stop heartbeat
+  private stopHeartbeat(): void {
+    if (this.heartbeatInterval) {
+      clearInterval(this.heartbeatInterval);
+      this.heartbeatInterval = null;
     }
   }
 
-  async emitOrderPriorityUpdate(orderId: string, priority: string) {
-    try {
-      const response = await fetch('/api/socket', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          type: 'order_priority_update',
-          data: {
-            orderId,
-            priority,
-            restaurantId: this.restaurantId
-          }
-        })
-      });
+  // Event subscription methods
+  onNewOrder(callback: (order: NewOrderData) => void): () => void {
+    if (!this.socket) return () => {};
+    
+    this.socket.on('new_order', callback);
+    return () => this.socket?.off('new_order', callback);
+  }
 
-      if (response.ok) {
-        console.log('📤 Order priority update sent:', { orderId, priority });
-        
-        // Trigger local event
-        this.triggerEvent('order_priority_update', {
-          orderId,
-          priority
-        });
-      }
-    } catch (error) {
-      console.error('Error sending order priority update:', error);
+  onOrderStatusUpdate(callback: (update: OrderUpdate) => void): () => void {
+    if (!this.socket) return () => {};
+    
+    this.socket.on('order_status_update', callback);
+    return () => this.socket?.off('order_status_update', callback);
+  }
+
+  onKitchenUpdate(callback: (update: KitchenUpdate) => void): () => void {
+    if (!this.socket) return () => {};
+    
+    this.socket.on('kitchen_update', callback);
+    return () => this.socket?.off('kitchen_update', callback);
+  }
+
+  onNewNotification(callback: (notification: NotificationData) => void): () => void {
+    if (!this.socket) return () => {};
+    
+    this.socket.on('new_notification', callback);
+    return () => this.socket?.off('new_notification', callback);
+  }
+
+  onInventoryUpdate(callback: (update: any) => void): () => void {
+    if (!this.socket) return () => {};
+    
+    this.socket.on('inventory_update', callback);
+    return () => this.socket?.off('inventory_update', callback);
+  }
+
+  // Emit events to server
+  async emitOrderStatusUpdate(orderId: string, status: string, notes?: string): Promise<void> {
+    if (!this.socket || !this.isConnected) {
+      throw new Error('WebSocket not connected');
     }
-  }
 
-  async emitNewOrder(orderData: any) {
-    try {
-      const response = await fetch('/api/socket', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          type: 'new_order',
-          data: {
-            ...orderData,
-            restaurantId: this.restaurantId
+    return new Promise((resolve, reject) => {
+      this.socket!.emit('update_order_status', 
+        { orderId, status, notes, restaurantId: this.restaurantId },
+        (response: any) => {
+          if (response.success) {
+            resolve();
+          } else {
+            reject(new Error(response.error || 'Failed to update order status'));
           }
-        })
-      });
+        }
+      );
+    });
+  }
 
-      if (response.ok) {
-        console.log('📤 New order event sent:', orderData.orderNumber);
-        
-        // Trigger local event and notification
-        this.triggerEvent('new_order', orderData);
-        this.triggerEvent('new_notification', {
-          _id: `order-${orderData._id}-${Date.now()}`,
-          type: 'order',
-          title: 'New Order Received',
-          message: `Order #${orderData.orderNumber}${orderData.tableNumber ? ` from Table ${orderData.tableNumber}` : ''}`,
-          priority: 'medium',
-          data: { 
-            orderId: orderData._id,
-            orderNumber: orderData.orderNumber,
-            tableNumber: orderData.tableNumber 
-          },
-          createdAt: new Date().toISOString()
-        });
-      }
-    } catch (error) {
-      console.error('Error sending new order event:', error);
+  async emitKitchenUpdate(orderId: string, status: string, estimatedTime?: number): Promise<void> {
+    if (!this.socket || !this.isConnected) {
+      throw new Error('WebSocket not connected');
     }
+
+    return new Promise((resolve, reject) => {
+      this.socket!.emit('kitchen_update', 
+        { orderId, status, estimatedTime, restaurantId: this.restaurantId },
+        (response: any) => {
+          if (response.success) {
+            resolve();
+          } else {
+            reject(new Error(response.error || 'Failed to send kitchen update'));
+          }
+        }
+      );
+    });
   }
 
-  // Utility Methods
-  isConnected(): boolean {
-    // In polling mode, we're "connected" if initialized
-    const connected = this.isInitialized;
-    return connected;
+  async emitInventoryUpdate(itemId: string, quantity: number, action: string): Promise<void> {
+    if (!this.socket || !this.isConnected) {
+      throw new Error('WebSocket not connected');
+    }
+
+    return new Promise((resolve, reject) => {
+      this.socket!.emit('inventory_update', 
+        { itemId, quantity, action, restaurantId: this.restaurantId },
+        (response: any) => {
+          if (response.success) {
+            resolve();
+          } else {
+            reject(new Error(response.error || 'Failed to update inventory'));
+          }
+        }
+      );
+    });
   }
 
-  getConnectionId(): string | undefined {
-    return this.isInitialized ? 'polling-mode' : undefined;
+  // Connection status methods
+  isSocketConnected(): boolean {
+    return this.socket?.connected || false;
   }
 
-  disconnect() {
-    console.log('🔌 Disconnecting from notification system');
-    this.eventListeners.clear();
+  getConnectionStatus(): 'connected' | 'disconnected' | 'error' {
+    if (!this.socket) return 'disconnected';
+    if (this.socket.connected) return 'connected';
+    return 'disconnected';
   }
 
-  // Debug method
-  getDebugInfo() {
+  // Disconnect and cleanup
+  disconnect(): void {
+    console.log('🔌 Disconnecting WebSocket...');
+    
+    this.stopHeartbeat();
+    
+    if (this.reconnectTimeout) {
+      clearTimeout(this.reconnectTimeout);
+      this.reconnectTimeout = null;
+    }
+
+    if (this.socket) {
+      this.socket.disconnect();
+      this.socket = null;
+    }
+
+    this.isConnected = false;
+    this.restaurantId = null;
+    this.authToken = null;
+    this.reconnectAttempts = 0;
+  }
+
+  // Debug information
+  getDebugInfo(): any {
     return {
-      isInitialized: this.isInitialized,
-      socketConnected: this.isInitialized,
-      socketId: this.isInitialized ? 'polling-mode' : undefined,
+      isConnected: this.isConnected,
+      socketConnected: this.socket?.connected || false,
+      socketId: this.socket?.id,
       restaurantId: this.restaurantId,
-      mode: 'polling',
-      eventListeners: Array.from(this.eventListeners.keys())
+      reconnectAttempts: this.reconnectAttempts,
+      hasSocket: !!this.socket,
+      connectionStatus: this.getConnectionStatus(),
     };
   }
 }
 
 // Create singleton instance
 export const socketManager = new SocketManager();
-
-// Export types for use in components
-export type { OrderUpdate, NewOrderData, NotificationData };

@@ -1,90 +1,50 @@
 "use client";
 
 import { useState } from "react";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { Bell, Check, X, Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
-  Bell,
-  BellOff,
-  Volume2,
-  VolumeX,
-  MoreHorizontal,
-  Check,
-  X,
-  Clock,
-  AlertTriangle,
-  Package,
-  ChefHat,
-  ShoppingCart,
-  Settings,
-} from "lucide-react";
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { useRealTimeNotifications } from "@/hooks/useRealTimeNotifications";
 import { formatDistanceToNow } from "date-fns";
 
-export default function NotificationDropdown() {
+export function NotificationDropdown() {
   const {
     notifications,
     unreadCount,
-    soundEnabled,
-    toggleSound,
     markAsRead,
-    isConnected,
+    getNotificationIcon,
     getNotificationColor,
   } = useRealTimeNotifications();
 
-  const [open, setOpen] = useState(false);
+  const [isOpen, setIsOpen] = useState(false);
 
-  const getNotificationIcon = (type: string, priority: string) => {
-    const iconClass = `h-4 w-4 ${
-      priority === "urgent"
-        ? "text-red-600"
-        : priority === "high"
-        ? "text-orange-600"
-        : priority === "medium"
-        ? "text-blue-600"
-        : "text-gray-600"
-    }`;
-
-    switch (type) {
-      case "order":
-        return <ShoppingCart className={iconClass} />;
-      case "kitchen":
-        return <ChefHat className={iconClass} />;
-      case "inventory":
-        return <Package className={iconClass} />;
-      case "system":
-        return <Settings className={iconClass} />;
-      default:
-        return <Bell className={iconClass} />;
-    }
-  };
-
-  const handleNotificationClick = async (notificationId: string) => {
+  const handleMarkAsRead = async (notificationId: string) => {
     await markAsRead(notificationId);
   };
 
+  const handleMarkAllAsRead = async () => {
+    // You would implement this in the hook
+    const unreadNotifications = notifications.filter((n) => !n.isRead);
+    for (const notification of unreadNotifications) {
+      await markAsRead(notification._id);
+    }
+  };
+
   return (
-    <DropdownMenu open={open} onOpenChange={setOpen}>
+    <DropdownMenu open={isOpen} onOpenChange={setIsOpen}>
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" size="sm" className="relative">
-          {isConnected ? (
-            <Bell className="h-5 w-5" />
-          ) : (
-            <BellOff className="h-5 w-5 text-gray-400" />
-          )}
+          <Bell className="h-4 w-4" />
           {unreadCount > 0 && (
             <Badge
               variant="destructive"
-              className="absolute -top-1 -right-1 h-5 w-5 rounded-full p-0 text-xs font-medium flex items-center justify-center"
+              className="absolute -top-1 -right-1 h-5 w-5 rounded-full p-0 text-xs flex items-center justify-center"
             >
               {unreadCount > 99 ? "99+" : unreadCount}
             </Badge>
@@ -92,136 +52,99 @@ export default function NotificationDropdown() {
         </Button>
       </DropdownMenuTrigger>
 
-      <DropdownMenuContent align="end" className="w-80 max-h-96" sideOffset={4}>
-        <div className="p-4 border-b">
-          <div className="flex items-center justify-between">
-            <div>
-              <DropdownMenuLabel className="text-base font-semibold p-0">
-                Notifications
-              </DropdownMenuLabel>
-              <p className="text-sm text-gray-500 mt-1">
-                {unreadCount > 0 ? `${unreadCount} unread` : "All caught up!"}
-              </p>
-            </div>
-
-            <div className="flex items-center space-x-2">
-              {/* Connection Status */}
-              <div className="flex items-center space-x-1">
-                <div
-                  className={`w-2 h-2 rounded-full ${
-                    isConnected ? "bg-green-500" : "bg-red-500"
-                  }`}
-                />
-                <span className="text-xs text-gray-500">
-                  {isConnected ? "Live" : "Offline"}
-                </span>
-              </div>
-
-              {/* Sound Toggle */}
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={toggleSound}
-                className="h-6 w-6 p-0"
-                title={soundEnabled ? "Disable sounds" : "Enable sounds"}
-              >
-                {soundEnabled ? (
-                  <Volume2 className="h-3 w-3" />
-                ) : (
-                  <VolumeX className="h-3 w-3" />
-                )}
-              </Button>
-            </div>
-          </div>
+      <DropdownMenuContent className="w-80" align="end">
+        <div className="flex items-center justify-between p-4 border-b">
+          <h3 className="font-semibold">Notifications</h3>
+          {unreadCount > 0 && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleMarkAllAsRead}
+              className="text-xs"
+            >
+              Mark all read
+            </Button>
+          )}
         </div>
 
-        <ScrollArea className="max-h-80">
+        <ScrollArea className="h-96">
           {notifications.length === 0 ? (
-            <div className="p-4 text-center text-gray-500">
+            <div className="p-4 text-center text-muted-foreground">
               <Bell className="h-8 w-8 mx-auto mb-2 opacity-50" />
-              <p className="text-sm">No notifications yet</p>
+              <p className="text-sm">No notifications</p>
             </div>
           ) : (
-            <div className="p-2">
+            <div className="space-y-1 p-2">
               {notifications.map((notification) => (
-                <DropdownMenuItem
+                <div
                   key={notification._id}
-                  className={`w-full p-3 mb-2 rounded-lg border cursor-pointer hover:bg-gray-50 focus:bg-gray-50 ${getNotificationColor(
-                    notification.priority
-                  )} ${!notification.isRead ? "font-medium" : "opacity-75"}`}
-                  onClick={() => handleNotificationClick(notification._id)}
+                  className={`p-3 rounded-lg border cursor-pointer hover:bg-muted/50 transition-colors ${
+                    !notification.isRead ? "bg-muted/30" : ""
+                  } ${getNotificationColor(notification.priority)}`}
+                  onClick={() => {
+                    if (!notification.isRead) {
+                      handleMarkAsRead(notification._id);
+                    }
+                    // Handle navigation to relevant page
+                    if (notification.data?.orderId) {
+                      window.location.href = `/dashboard/orders/${notification.data.orderId}`;
+                    }
+                  }}
                 >
-                  <div className="flex items-start space-x-3 w-full">
-                    <div className="flex-shrink-0 mt-0.5">
-                      {getNotificationIcon(
-                        notification.type,
-                        notification.priority
-                      )}
-                    </div>
-
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <p className="text-sm font-medium text-gray-900 mb-1">
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-start space-x-3 flex-1">
+                      <div className="text-lg">
+                        {getNotificationIcon({
+                          ...notification,
+                          type: (["order", "kitchen", "inventory", "system"].includes(notification.type)
+                            ? notification.type
+                            : "system") as "order" | "kitchen" | "inventory" | "system",
+                          timestamp: new Date(notification.createdAt),
+                        })}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between">
+                          <p className="text-sm font-medium truncate">
                             {notification.title}
                           </p>
-                          <p className="text-sm text-gray-600 leading-relaxed">
-                            {notification.message}
-                          </p>
+                          {!notification.isRead && (
+                            <div className="w-2 h-2 bg-blue-500 rounded-full ml-2" />
+                          )}
                         </div>
-
-                        {!notification.isRead && (
-                          <div className="w-2 h-2 bg-blue-500 rounded-full flex-shrink-0 mt-2 ml-2" />
-                        )}
-                      </div>
-
-                      <div className="flex items-center justify-between mt-2">
-                        <span className="text-xs text-gray-500">
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {notification.message}
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-1">
                           {formatDistanceToNow(
-                            new Date(notification.createdAt),
+                            new Date(notification.createdAt
+                            ),
                             { addSuffix: true }
                           )}
-                        </span>
-
-                        <Badge
-                          variant={
-                            notification.priority === "urgent"
-                              ? "destructive"
-                              : notification.priority === "high"
-                              ? "secondary"
-                              : "outline"
-                          }
-                          className="text-xs"
-                        >
-                          {notification.priority}
-                        </Badge>
+                        </p>
                       </div>
                     </div>
                   </div>
-                </DropdownMenuItem>
+                </div>
               ))}
             </div>
           )}
         </ScrollArea>
 
         {notifications.length > 0 && (
-          <>
-            <DropdownMenuSeparator />
-            <div className="p-2">
-              <Button
-                variant="ghost"
-                size="sm"
-                className="w-full text-center"
-                onClick={() => {
-                  setOpen(false);
-                  // Navigate to full notifications page
-                  // router.push('/dashboard/notifications');
-                }}
-              >
-                View all notifications
-              </Button>
-            </div>
-          </>
+          <div className="p-2 border-t">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="w-full"
+              onClick={() => {
+                window.location.href = "/dashboard/notifications";
+                setIsOpen(false);
+              }}
+            >
+              <Eye className="h-3 w-3 mr-2" />
+              View all notifications
+            </Button>
+          </div>
         )}
       </DropdownMenuContent>
     </DropdownMenu>
